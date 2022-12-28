@@ -6,7 +6,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/AbramovArseniy/RuntimeMetrics/internal/agent"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent"
 )
 
 const (
