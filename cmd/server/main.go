@@ -14,10 +14,9 @@ const (
 
 func StartServer() {
 	srv := &http.Server{
-		Addr: Server + ":" + Port,
+		Addr:    Server + ":" + Port,
+		Handler: server.Router(),
 	}
-	http.HandleFunc("/update/", server.PostMetricHandler)
-	log.Println("Server started")
 	log.Fatal(srv.ListenAndServe())
 
 }
