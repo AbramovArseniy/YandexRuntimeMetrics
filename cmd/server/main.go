@@ -8,17 +8,20 @@ import (
 )
 
 const (
-	Server = "127.0.0.1"
-	Port   = "8080"
+	DefaultHost = "127.0.0.1"
+	DefaultPort = "8080"
 )
 
 func StartServer() {
 	srv := &http.Server{
-		Addr:    Server + ":" + Port,
+		Addr:    DefaultHost + ":" + DefaultPort,
 		Handler: server.Router(),
 	}
-	log.Fatal(srv.ListenAndServe())
-
+	log.Println("Server started")
+	err := srv.ListenAndServe()
+	if err != nil && err != http.ErrServerClosed {
+		log.Fatal(err)
+	}
 }
 
 func main() {

@@ -3,13 +3,13 @@ package agent
 import "time"
 
 const (
-	Protocol    = "http://"
-	Server      = "127.0.0.1"
-	Port        = "8080"
-	ContentType = "text/plain"
-	TCP         = "tcp"
-	Timeout     = 2 * time.Second
+	DefaultProtocol      = "http://"
+	DefaultHost          = "127.0.0.1"
+	DefaultPort          = "8080"
+	ContentTypeTextPlain = "text/plain"
+	TCP                  = "tcp"
+	DefaultTimeout       = 2 * time.Second
 )
 
-var Metrics []Gauge
+var allMetrics []Gauge
 var PollCount int64

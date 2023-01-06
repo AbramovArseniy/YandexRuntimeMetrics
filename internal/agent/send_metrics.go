@@ -2,6 +2,7 @@ package agent
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -16,48 +17,65 @@ type Counter struct {
 	metricValue int64
 }
 
-func (metric Gauge) SendGauge(client *http.Client) (bool, error) {
-	url := fmt.Sprintf("%s%s:%s/update/gauge/%s/%f", Protocol, Server, Port, metric.metricName, metric.metricValue)
+type metricSender struct {
+	client *http.Client
+}
+
+func NewSender() *metricSender {
+	return &metricSender{
+		client: &http.Client{},
+	}
+}
+
+func (s *metricSender) SendGauge(metric Gauge) (bool, error) {
+	url := fmt.Sprintf("%s%s:%s/update/gauge/%s/%f", DefaultProtocol, DefaultHost, DefaultPort, metric.metricName, metric.metricValue)
 	body := strings.NewReader("")
-	resp, err := client.Post(url, "text/plain", body)
+	resp, err := s.client.Post(url, "text/plain", body)
 	if err != nil {
+		log.Println(err.Error())
 		return false, err
 	}
 	err = resp.Body.Close()
 	if err != nil {
+		log.Println(err.Error())
 		return false, err
 	}
 	return true, nil
 }
 
-func (metric Counter) SendCounter(client *http.Client) (bool, error) {
-	url := fmt.Sprintf("%s%s:%s/update/counter/%s/%d", Protocol, Server, Port, metric.metricName, metric.metricValue)
+func (s *metricSender) SendCounter(metric Counter) (bool, error) {
+	url := fmt.Sprintf("%s%s:%s/update/gauge/%s/%d", DefaultProtocol, DefaultHost, DefaultPort, metric.metricName, metric.metricValue)
 	body := strings.NewReader("")
-	resp, err := client.Post(url, "text/plain", body)
+	resp, err := s.client.Post(url, "text/plain", body)
 	if err != nil {
+		log.Println(err.Error())
 		return false, err
 	}
 	err = resp.Body.Close()
 	if err != nil {
+		log.Println(err.Error())
 		return false, err
 	}
 	return true, nil
 }
 
 func SendAllMetrics() {
-	Metrics = CollectRandomValueMetric(Metrics)
-	client := http.Client{Timeout: Timeout}
-	for _, i := range Metrics {
-		_, err := i.SendGauge(&client)
+	s := NewSender()
+	newMetrics := CollectRandomValueMetric()
+	allMetrics = append(allMetrics, newMetrics)
+	for _, metric := range allMetrics {
+		_, err := s.SendGauge(metric)
 		if err != nil {
+			log.Println("can't send Gauge " + err.Error())
 			return
 		}
 	}
 	metricCounter := Counter{metricName: "PollCount", metricValue: PollCount}
 	PollCount = 0
-	_, err := metricCounter.SendCounter(&client)
+	_, err := s.SendCounter(metricCounter)
 	if err != nil {
+		log.Println("can't send Counter " + err.Error())
 		return
 	}
-	client.CloseIdleConnections()
+	s.client.CloseIdleConnections()
 }

@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"log"
 	"math/rand"
 	"runtime"
 	"time"
@@ -10,7 +11,7 @@ func CollectRuntimeMetrics() {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
 	PollCount += 1
-	Metrics = []Gauge{
+	allMetrics = []Gauge{
 		{metricName: "Alloc", metricValue: float64(stats.Alloc)},
 		{metricName: "BuckHashSys", metricValue: float64(stats.BuckHashSys)},
 		{metricName: "Frees", metricValue: float64(stats.Frees)},
@@ -38,11 +39,12 @@ func CollectRuntimeMetrics() {
 		{metricName: "StackSys", metricValue: float64(stats.StackSys)},
 		{metricName: "Sys", metricValue: float64(stats.Sys)},
 	}
+	log.Println("Collected GaugeMetrics")
 }
 
-func CollectRandomValueMetric(metrics []Gauge) []Gauge {
+func CollectRandomValueMetric() Gauge {
 	rand.Seed(time.Now().Unix())
 	randomValueMetric := Gauge{metricName: "RandomValue", metricValue: rand.Float64() * 1000}
-	metrics = append(metrics, randomValueMetric)
-	return metrics
+	log.Println("Collected RandomValueMectric")
+	return randomValueMetric
 }

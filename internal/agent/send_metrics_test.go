@@ -26,7 +26,7 @@ func TestSendCounter(t *testing.T) {
 				name:  "PollCount",
 				value: 5,
 			},
-			client:      &http.Client{Timeout: Timeout},
+			client:      &http.Client{Timeout: DefaultTimeout},
 			want:        true,
 			expectError: false,
 		},
@@ -37,8 +37,8 @@ func TestSendCounter(t *testing.T) {
 				metricName:  test.metric.name,
 				metricValue: test.metric.value,
 			}
-
-			l, err := net.Listen(TCP, Server+":"+Port)
+			s := NewSender()
+			l, err := net.Listen(TCP, DefaultHost+":"+DefaultPort)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -56,7 +56,7 @@ func TestSendCounter(t *testing.T) {
 
 			defer srv.Close()
 
-			got, err := metric.SendCounter(test.client)
+			got, err := s.SendCounter(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendCounter() error = %v, expectError %v", err, test.expectError)
 				return
@@ -87,7 +87,7 @@ func TestSendGauge(t *testing.T) {
 				name:  "PollCount",
 				value: 5.5,
 			},
-			client:      &http.Client{Timeout: Timeout},
+			client:      &http.Client{Timeout: DefaultTimeout},
 			want:        true,
 			expectError: false,
 		},
@@ -98,8 +98,8 @@ func TestSendGauge(t *testing.T) {
 				metricName:  test.metric.name,
 				metricValue: test.metric.value,
 			}
-
-			l, err := net.Listen(TCP, Server+":"+Port)
+			s := NewSender()
+			l, err := net.Listen(TCP, DefaultHost+":"+DefaultPort)
 			if err != nil {
 				log.Fatal(err)
 			}
@@ -117,7 +117,7 @@ func TestSendGauge(t *testing.T) {
 
 			defer srv.Close()
 
-			got, err := metric.SendGauge(test.client)
+			got, err := s.SendGauge(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendGauge() error = %v, expectError %v", err, test.expectError)
 				return
