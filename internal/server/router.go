@@ -5,9 +5,15 @@ import (
 )
 
 func Router() chi.Router {
+	h := Handler{
+		storage: MemStorage{
+			CounterMetrics: make(map[string]int64),
+			GaugeMetrics:   make(map[string]float64),
+		},
+	}
 	router := chi.NewRouter()
-	router.Get("/", GetAllMetricsHandler)
-	router.Get("/value/{type}/{name}", GetMetricHandler)
-	router.Post("/update/{type}/{name}/{value}", PostMetricHandler)
+	router.Get("/", h.GetAllMetricsHandler)
+	router.Get("/value/{type}/{name}", h.GetMetricHandler)
+	router.Post("/update/{type}/{name}/{value}", h.PostMetricHandler)
 	return router
 }

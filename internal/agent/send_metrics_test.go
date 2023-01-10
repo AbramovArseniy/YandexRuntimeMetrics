@@ -6,6 +6,12 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
+)
+
+const (
+	TCP            = "tcp"
+	DefaultTimeout = 2 * time.Second
 )
 
 func TestSendCounter(t *testing.T) {
@@ -17,7 +23,6 @@ func TestSendCounter(t *testing.T) {
 		name        string
 		metric      metric
 		client      *http.Client
-		want        bool
 		expectError bool
 	}{
 		{
@@ -27,7 +32,6 @@ func TestSendCounter(t *testing.T) {
 				value: 5,
 			},
 			client:      &http.Client{Timeout: DefaultTimeout},
-			want:        true,
 			expectError: false,
 		},
 	}
@@ -56,13 +60,10 @@ func TestSendCounter(t *testing.T) {
 
 			defer srv.Close()
 
-			got, err := s.SendCounter(metric)
+			err = s.SendCounter(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendCounter() error = %v, expectError %v", err, test.expectError)
 				return
-			}
-			if got != test.want {
-				t.Errorf("counter.SendCounter() = %v, want %v", got, test.want)
 			}
 		})
 	}
@@ -78,7 +79,6 @@ func TestSendGauge(t *testing.T) {
 		name        string
 		metric      metric
 		client      *http.Client
-		want        bool
 		expectError bool
 	}{
 		{
@@ -88,7 +88,6 @@ func TestSendGauge(t *testing.T) {
 				value: 5.5,
 			},
 			client:      &http.Client{Timeout: DefaultTimeout},
-			want:        true,
 			expectError: false,
 		},
 	}
@@ -117,13 +116,10 @@ func TestSendGauge(t *testing.T) {
 
 			defer srv.Close()
 
-			got, err := s.SendGauge(metric)
+			err = s.SendGauge(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendGauge() error = %v, expectError %v", err, test.expectError)
 				return
-			}
-			if got != test.want {
-				t.Errorf("counter.SendGauge() = %v, want %v", got, test.want)
 			}
 		})
 	}

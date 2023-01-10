@@ -70,7 +70,7 @@ func TestGetMetricHandler(t *testing.T) {
 			want:   want{code: 400},
 		},
 		{
-			name:   "400 post: wrong metric type",
+			name:   "501 post: wrong metric type",
 			URL:    "/update/wrongType/name/123",
 			method: http.MethodPost,
 			want:   want{code: 501},
