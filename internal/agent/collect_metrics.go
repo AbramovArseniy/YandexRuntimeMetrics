@@ -7,11 +7,23 @@ import (
 	"time"
 )
 
-func CollectRuntimeMetrics() {
+type metricCollector struct {
+	GaugeMetrics []Gauge
+	PollCount    int64
+}
+
+func newCollector() *metricCollector {
+	return &metricCollector{
+		GaugeMetrics: make([]Gauge, 0),
+		PollCount:    0,
+	}
+}
+
+func (a *Agent) CollectRuntimeMetrics() {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
-	PollCount += 1
-	allMetrics = []Gauge{
+	a.collector.PollCount += 1
+	a.collector.GaugeMetrics = []Gauge{
 		{metricName: "Alloc", metricValue: float64(stats.Alloc)},
 		{metricName: "BuckHashSys", metricValue: float64(stats.BuckHashSys)},
 		{metricName: "Frees", metricValue: float64(stats.Frees)},
@@ -42,7 +54,7 @@ func CollectRuntimeMetrics() {
 	log.Println("Collected GaugeMetrics")
 }
 
-func CollectRandomValueMetric() Gauge {
+func (s *metricCollector) CollectRandomValueMetric() Gauge {
 	rand.Seed(time.Now().Unix())
 	randomValueMetric := Gauge{metricName: "RandomValue", metricValue: rand.Float64() * 1000}
 	log.Println("Collected RandomValueMectric")

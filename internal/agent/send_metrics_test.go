@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"log"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -10,8 +9,8 @@ import (
 )
 
 const (
-	TCP            = "tcp"
-	DefaultTimeout = 2 * time.Second
+	tcp            = "tcp"
+	defaultTimeout = 2 * time.Second
 )
 
 func TestSendCounter(t *testing.T) {
@@ -31,7 +30,7 @@ func TestSendCounter(t *testing.T) {
 				name:  "PollCount",
 				value: 5,
 			},
-			client:      &http.Client{Timeout: DefaultTimeout},
+			client:      &http.Client{Timeout: defaultTimeout},
 			expectError: false,
 		},
 	}
@@ -42,9 +41,10 @@ func TestSendCounter(t *testing.T) {
 				metricValue: test.metric.value,
 			}
 			s := NewSender()
-			l, err := net.Listen(TCP, DefaultHost+":"+DefaultPort)
+			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
 			if err != nil {
-				log.Fatal(err)
+				t.Errorf("%v", err)
+				return
 			}
 			serveMux := http.NewServeMux()
 			serveMux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
@@ -87,7 +87,7 @@ func TestSendGauge(t *testing.T) {
 				name:  "PollCount",
 				value: 5.5,
 			},
-			client:      &http.Client{Timeout: DefaultTimeout},
+			client:      &http.Client{Timeout: defaultTimeout},
 			expectError: false,
 		},
 	}
@@ -98,9 +98,10 @@ func TestSendGauge(t *testing.T) {
 				metricValue: test.metric.value,
 			}
 			s := NewSender()
-			l, err := net.Listen(TCP, DefaultHost+":"+DefaultPort)
+			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
 			if err != nil {
-				log.Fatal(err)
+				t.Errorf("%v", err)
+				return
 			}
 			serveMux := http.NewServeMux()
 			serveMux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {

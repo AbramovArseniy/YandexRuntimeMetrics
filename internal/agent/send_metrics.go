@@ -27,17 +27,17 @@ func NewSender() *metricSender {
 	}
 }
 
-type agent struct {
-	sender *metricSender
+type Agent struct {
+	sender    *metricSender
+	collector *metricCollector
 }
 
-func NewAgent() *agent {
-	return &agent{
-		sender: NewSender(),
+func NewAgent() *Agent {
+	return &Agent{
+		sender:    NewSender(),
+		collector: newCollector(),
 	}
 }
-
-var a = NewAgent()
 
 func (s *metricSender) SendGauge(metric Gauge) error {
 	url := fmt.Sprintf("%s%s:%s/update/gauge/%s/%f", DefaultProtocol, DefaultHost, DefaultPort, metric.metricName, metric.metricValue)
@@ -67,10 +67,10 @@ func (s *metricSender) SendCounter(metric Counter) error {
 	return nil
 }
 
-func SendAllMetrics() {
-	newMetrics := CollectRandomValueMetric()
-	allMetrics = append(allMetrics, newMetrics)
-	for _, metric := range allMetrics {
+func (a *Agent) SendAllMetrics() {
+	newMetrics := a.collector.CollectRandomValueMetric()
+	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
+	for _, metric := range a.collector.GaugeMetrics {
 		err := a.sender.SendGauge(metric)
 		if err != nil {
 			log.Println("can't send Gauge " + err.Error())
@@ -78,8 +78,8 @@ func SendAllMetrics() {
 		}
 	}
 	log.Println("Sent Gauge")
-	metricCounter := Counter{metricName: "PollCount", metricValue: PollCount}
-	PollCount = 0
+	metricCounter := Counter{metricName: "PollCount", metricValue: a.collector.PollCount}
+	a.collector.PollCount = 0
 	err := a.sender.SendCounter(metricCounter)
 	if err != nil {
 		log.Println("can't send Counter " + err.Error())
