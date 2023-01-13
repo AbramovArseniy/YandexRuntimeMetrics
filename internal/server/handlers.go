@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -8,6 +10,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+const contentTypeJson = "application/json"
 
 type Handler struct {
 	storage MemStorage
@@ -91,4 +95,95 @@ func (h *Handler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	default:
 		http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 	}
+}
+
+func (h *Handler) PostMetricJsonHandler(rw http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != contentTypeJson {
+		rw.WriteHeader(http.StatusBadRequest)
+		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
+		if err != nil {
+			log.Println("Wrong content type")
+			return
+		}
+		log.Println("Wrong content type")
+		return
+	}
+	log.Println(r.Body)
+	var m Metrics
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		log.Println("Decode problem")
+		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
+		if err != nil {
+			return
+		}
+		return
+	}
+	log.Println("POST JSON" + m.ID + m.MType)
+	err := h.storeMetrics(m)
+	if err != nil {
+		rw.Header().Set("Content-Type", contentTypeJson)
+		log.Println(err)
+		http.Error(rw, "No such type of metric", http.StatusNotImplemented)
+		return
+	}
+	rw.Header().Add("Content-Type", contentTypeJson)
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) GetMetricPostJsonHandler(rw http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != contentTypeJson {
+		rw.WriteHeader(http.StatusBadRequest)
+		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
+		if err != nil {
+			log.Println("Wrong content type")
+			return
+		}
+		return
+	}
+	log.Println(r.Body)
+	var m Metrics
+	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
+		rw.WriteHeader(http.StatusBadRequest)
+		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
+		if err != nil {
+			log.Println("Decode problem")
+			return
+		}
+		return
+	}
+	switch m.MType {
+	case "counter":
+		*m.Delta = h.storage.CounterMetrics[m.ID]
+	case "gauge":
+		*m.Value = h.storage.GaugeMetrics[m.ID]
+	default:
+		http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+	}
+	var jsonMetric, err = json.MarshalIndent(m, "", "  ")
+	if err != nil {
+		log.Printf("json Marshal error: %s", err)
+		return
+	}
+	_, err = rw.Write(jsonMetric)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	rw.Header().Add("Content-Type", "application/json")
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (h *Handler) storeMetrics(m Metrics) error {
+	switch m.MType {
+	case "gauge":
+		log.Printf("saving metric %s %s %f\n", m.ID, m.MType, *m.Value)
+		h.storage.GaugeMetrics[m.ID] = *m.Value
+	case "counter":
+		log.Printf("saving metric %s %s %d\n", m.ID, m.MType, *m.Delta)
+		h.storage.CounterMetrics[m.ID] += *m.Delta
+	default:
+		return errors.New("no such type of metric")
+	}
+	return nil
 }

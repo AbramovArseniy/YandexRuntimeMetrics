@@ -40,9 +40,9 @@ func NewAgent() *Agent {
 }
 
 func (s *metricSender) SendGauge(metric Gauge) error {
-	url := fmt.Sprintf("%s%s:%s/update/gauge/%s/%f", DefaultProtocol, DefaultHost, DefaultPort, metric.metricName, metric.metricValue)
-	body := strings.NewReader("")
-	resp, err := s.client.Post(url, "text/plain", body)
+	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
+	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","value":%f}`, metric.metricName, "gauge", metric.metricValue))
+	resp, err := s.client.Post(url, "application/json", body)
 	if err != nil {
 		return err
 	}
@@ -50,9 +50,9 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 }
 
 func (s *metricSender) SendCounter(metric Counter) error {
-	url := fmt.Sprintf("%s%s:%s/update/counter/%s/%d", DefaultProtocol, DefaultHost, DefaultPort, metric.metricName, metric.metricValue)
-	body := strings.NewReader("")
-	resp, err := s.client.Post(url, "text/plain", body)
+	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
+	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","delta":%d}`, metric.metricName, "counter", metric.metricValue))
+	resp, err := s.client.Post(url, "application/json", body)
 	if err != nil {
 		return err
 	}
