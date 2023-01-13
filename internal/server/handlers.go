@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"strconv"
@@ -142,35 +143,46 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 		return
 	}
 	log.Println(r.Body)
-	var m Metrics
-	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
-		rw.WriteHeader(http.StatusBadRequest)
-		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
-		if err != nil {
-			log.Println("Decode problem")
-			return
-		}
+	body, err := io.ReadAll(r.Body)
+	rw.Header().Set("Content-Type", "application/json")
+
+	if err != nil {
+		http.Error(rw, "reading body error", http.StatusInternalServerError)
 		return
 	}
+	var m Metrics
+	json.Unmarshal(body, &m)
+
 	switch m.MType {
 	case "counter":
-		*m.Delta = h.storage.CounterMetrics[m.ID]
+		val, isIn := h.storage.CounterMetrics[m.ID]
+		if !isIn {
+			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+			return
+		}
+		m.Delta = &val
 	case "gauge":
-		*m.Value = h.storage.GaugeMetrics[m.ID]
+		val, isIn := h.storage.GaugeMetrics[m.ID]
+		if !isIn {
+			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+			return
+		}
+		m.Value = &val
 	default:
-		http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+		http.Error(rw, "There is no metric You requested", http.StatusNotFound)
+		return
 	}
-	var jsonMetric, err = json.MarshalIndent(m, "", "  ")
+	jsonMetric, err := json.Marshal(m)
 	if err != nil {
 		log.Printf("json Marshal error: %s", err)
 		return
 	}
 	_, err = rw.Write(jsonMetric)
 	if err != nil {
+		http.Error(rw, "can't write body", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
-	rw.Header().Add("Content-Type", "application/json")
 	rw.WriteHeader(http.StatusOK)
 }
 
