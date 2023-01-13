@@ -15,7 +15,7 @@ func Router() chi.Router {
 	router.Get("/", h.GetAllMetricsHandler)
 	router.Get("/value/{type}/{name}", h.GetMetricHandler)
 	router.Post("/update/{type}/{name}/{value}", h.PostMetricHandler)
-	router.Post("/update", h.PostMetricJsonHandler)
-	router.Post("/value", h.GetMetricPostJsonHandler)
+	router.Post("/update", h.PostMetricJSONHandler)
+	router.Post("/value", h.GetMetricPostJSONHandler)
 	return router
 }

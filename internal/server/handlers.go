@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const contentTypeJson = "application/json"
+const contentTypeJSON = "application/json"
 
 type Handler struct {
 	storage MemStorage
@@ -97,8 +97,8 @@ func (h *Handler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) PostMetricJsonHandler(rw http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != contentTypeJson {
+func (h *Handler) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
 		if err != nil {
@@ -122,17 +122,17 @@ func (h *Handler) PostMetricJsonHandler(rw http.ResponseWriter, r *http.Request)
 	log.Println("POST JSON" + m.ID + m.MType)
 	err := h.storeMetrics(m)
 	if err != nil {
-		rw.Header().Set("Content-Type", contentTypeJson)
+		rw.Header().Set("Content-Type", contentTypeJSON)
 		log.Println(err)
 		http.Error(rw, "No such type of metric", http.StatusNotImplemented)
 		return
 	}
-	rw.Header().Add("Content-Type", contentTypeJson)
+	rw.Header().Add("Content-Type", contentTypeJSON)
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) GetMetricPostJsonHandler(rw http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("Content-Type") != contentTypeJson {
+func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
 		if err != nil {
