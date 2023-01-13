@@ -129,6 +129,17 @@ func (h *Handler) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request)
 		return
 	}
 	rw.Header().Add("Content-Type", contentTypeJSON)
+	jsonMetric, err := json.Marshal(m)
+	if err != nil {
+		log.Printf("json Marshal error: %s", err)
+		return
+	}
+	_, err = rw.Write(jsonMetric)
+	if err != nil {
+		http.Error(rw, "can't write body", http.StatusInternalServerError)
+		log.Println(err)
+		return
+	}
 	rw.WriteHeader(http.StatusOK)
 }
 
