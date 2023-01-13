@@ -16,7 +16,7 @@ const (
 )
 
 func main() {
-	var a agent.Agent = *agent.NewAgent()
+	a := agent.NewAgent()
 	go agent.Repeat(a.CollectRuntimeMetrics, pollRuntimeMetricsInterval)
 	go agent.Repeat(a.SendAllMetrics, reportInterval)
 	log.Println("Agent started")

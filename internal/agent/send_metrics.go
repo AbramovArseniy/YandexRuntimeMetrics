@@ -46,11 +46,7 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 	if err != nil {
 		return err
 	}
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return resp.Body.Close()
 }
 
 func (s *metricSender) SendCounter(metric Counter) error {
@@ -60,11 +56,7 @@ func (s *metricSender) SendCounter(metric Counter) error {
 	if err != nil {
 		return err
 	}
-	err = resp.Body.Close()
-	if err != nil {
-		return err
-	}
-	return nil
+	return resp.Body.Close()
 }
 
 func (a *Agent) SendAllMetrics() {
