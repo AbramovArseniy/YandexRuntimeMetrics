@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - increment4
+      - iter4
 
 jobs:
 
