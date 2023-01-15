@@ -42,7 +42,14 @@ func NewAgent() *Agent {
 func (s *metricSender) SendGauge(metric Gauge) error {
 	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
 	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","value":%f}`, metric.metricName, "gauge", metric.metricValue))
-	resp, err := s.client.Post(url, "application/json", body)
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		return err
+	}
+	req.Close = true
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.client.Do(req)
+
 	if err != nil {
 		return err
 	}
