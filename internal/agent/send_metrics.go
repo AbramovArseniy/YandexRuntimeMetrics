@@ -44,6 +44,7 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","value":%f}`, metric.metricName, "gauge", metric.metricValue))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
+		log.Println("Request Creation error")
 		return err
 	}
 	req.Close = true
@@ -51,6 +52,7 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 	resp, err := s.client.Do(req)
 
 	if err != nil {
+		log.Println("client.Do error")
 		return err
 	}
 	return resp.Body.Close()
@@ -59,8 +61,16 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 func (s *metricSender) SendCounter(metric Counter) error {
 	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
 	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","delta":%d}`, metric.metricName, "counter", metric.metricValue))
-	resp, err := s.client.Post(url, "application/json", body)
+	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
+		log.Println("Request Creation error")
+		return err
+	}
+	req.Close = true
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := s.client.Do(req)
+	if err != nil {
+		log.Println("client.Do error")
 		return err
 	}
 	return resp.Body.Close()
@@ -85,5 +95,4 @@ func (a *Agent) SendAllMetrics() {
 		return
 	}
 	log.Println("Sent Counter")
-	a.sender.client.CloseIdleConnections()
 }

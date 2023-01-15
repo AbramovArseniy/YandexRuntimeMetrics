@@ -34,13 +34,13 @@ func TestSendCounter(t *testing.T) {
 			expectError: false,
 		},
 	}
+	a := NewAgent()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Counter{
 				metricName:  test.metric.name,
 				metricValue: test.metric.value,
 			}
-			s := NewSender()
 			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
 			if err != nil {
 				t.Errorf("%v", err)
@@ -60,7 +60,7 @@ func TestSendCounter(t *testing.T) {
 
 			defer srv.Close()
 
-			err = s.SendCounter(metric)
+			err = a.sender.SendCounter(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendCounter() error = %v, expectError %v", err, test.expectError)
 				return
@@ -85,19 +85,19 @@ func TestSendGauge(t *testing.T) {
 			name: "OK Result",
 			metric: metric{
 				name:  "PollCount",
-				value: 5.5,
+				value: 5.567675674566564534343565445434345343768767867676786786766867676767676767667676767676677,
 			},
 			client:      &http.Client{Timeout: defaultTimeout},
 			expectError: false,
 		},
 	}
+	a := NewAgent()
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Gauge{
 				metricName:  test.metric.name,
 				metricValue: test.metric.value,
 			}
-			s := NewSender()
 			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
 			if err != nil {
 				t.Errorf("%v", err)
@@ -117,7 +117,7 @@ func TestSendGauge(t *testing.T) {
 
 			defer srv.Close()
 
-			err = s.SendGauge(metric)
+			err = a.sender.SendGauge(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendGauge() error = %v, expectError %v", err, test.expectError)
 				return
