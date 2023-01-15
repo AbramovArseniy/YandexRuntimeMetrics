@@ -109,7 +109,6 @@ func (h *Handler) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request)
 		log.Println("Wrong content type")
 		return
 	}
-	log.Println(r.Body)
 	var m Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		rw.WriteHeader(http.StatusBadRequest)
@@ -120,12 +119,12 @@ func (h *Handler) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
-	log.Println("POST JSON" + m.ID + m.MType)
+	log.Println("POST JSON " + m.ID + " " + m.MType)
 	err := h.storeMetrics(m)
 	if err != nil {
 		rw.Header().Set("Content-Type", contentTypeJSON)
 		log.Println(err)
-		http.Error(rw, "No such type of metric", http.StatusNotImplemented)
+		http.Error(rw, err.Error(), http.StatusNotImplemented)
 		return
 	}
 	rw.Header().Add("Content-Type", contentTypeJSON)
@@ -153,7 +152,6 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
-	log.Println(r.Body)
 	body, err := io.ReadAll(r.Body)
 	rw.Header().Set("Content-Type", "application/json")
 
@@ -200,9 +198,15 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 func (h *Handler) storeMetrics(m Metrics) error {
 	switch m.MType {
 	case "gauge":
+		if m.Value == nil {
+			return errors.New("no value in update request")
+		}
 		log.Printf("saving metric %s %s %f\n", m.ID, m.MType, *m.Value)
 		h.storage.GaugeMetrics[m.ID] = *m.Value
 	case "counter":
+		if m.Delta == nil {
+			return errors.New("no value in update request")
+		}
 		log.Printf("saving metric %s %s %d\n", m.ID, m.MType, *m.Delta)
 		h.storage.CounterMetrics[m.ID] += *m.Delta
 	default:
