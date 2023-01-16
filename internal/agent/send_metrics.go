@@ -81,8 +81,6 @@ func (s *metricSender) SendCounter(metric Counter) error {
 
 func (a *Agent) SendAllMetrics() {
 	newMetrics := a.collector.CollectRandomValueMetric()
-	log.Println(newMetrics)
-	/*newMetrics := a.collector.CollectRandomValueMetric()
 	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
 	for _, metric := range a.collector.GaugeMetrics {
 		err := a.sender.SendGauge(metric)
@@ -99,5 +97,5 @@ func (a *Agent) SendAllMetrics() {
 		log.Println("can't send Counter " + err.Error())
 		return
 	}
-	log.Println("Sent Counter")*/
+	log.Println("Sent Counter")
 }
