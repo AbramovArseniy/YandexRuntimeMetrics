@@ -1,10 +1,10 @@
 package agent
 
 import (
-	"fmt"
-	"log"
+	//"fmt"
+	//"log"
 	"net/http"
-	"strings"
+	//"strings"
 )
 
 type Gauge struct {
@@ -39,7 +39,7 @@ func NewAgent() *Agent {
 	}
 }
 
-func (s *metricSender) SendGauge(metric Gauge) error {
+/*func (s *metricSender) SendGauge(metric Gauge) error {
 	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
 	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","value":%f}`, metric.metricName, "gauge", metric.metricValue))
 	req, err := http.NewRequest("POST", url, body)
@@ -96,3 +96,4 @@ func (a *Agent) SendAllMetrics() {
 	}
 	log.Println("Sent Counter")
 }
+*/
