@@ -8,16 +8,47 @@ import (
 	"time"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent"
+	"github.com/joho/godotenv"
 )
 
+func init() {
+	// loads values from .env into the system
+	if err := godotenv.Load(); err != nil {
+		log.Print("No .env file found")
+	}
+}
+
 const (
-	pollRuntimeMetricsInterval = 2 * time.Second
-	reportInterval             = 10 * time.Second
+	defaultPollInterval   = 2 * time.Second
+	defaultReportInterval = 10 * time.Second
+	defaultAddress        = "localhost:8080"
 )
 
 func main() {
+	var reportInterval, pollInterval time.Duration
+	if strPollInterval, exists := os.LookupEnv("POLL_INTERVAL"); !exists {
+		pollInterval = defaultPollInterval
+	} else {
+		var err error
+		if pollInterval, err = time.ParseDuration(strPollInterval); err != nil {
+			log.Println("couldn't parse poll duration")
+		}
+	}
+	if strReportInterval, exists := os.LookupEnv("REPORT_INTERVAL"); !exists {
+		reportInterval = defaultReportInterval
+	} else {
+		var err error
+		if reportInterval, err = time.ParseDuration(strReportInterval); err != nil {
+			log.Println("couldn't parse report duration")
+		}
+	}
+	address, exists := os.LookupEnv("ADDRESS")
+	if !exists {
+		address = defaultAddress
+	}
 	a := agent.NewAgent()
-	go agent.Repeat(a.CollectRuntimeMetrics, pollRuntimeMetricsInterval)
+	a.Address = address
+	go agent.Repeat(a.CollectRuntimeMetrics, pollInterval)
 	go agent.Repeat(a.SendAllMetrics, reportInterval)
 	log.Println("Agent started")
 	cancelSignal := make(chan os.Signal, 1)

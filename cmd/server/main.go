@@ -3,19 +3,24 @@ package main
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
 )
 
 const (
-	DefaultHost = "127.0.0.1"
-	DefaultPort = "8080"
+	defaultAddress = "localhost:8080"
 )
 
 func StartServer() {
 	srv := &http.Server{
-		Addr:    DefaultHost + ":" + DefaultPort,
 		Handler: server.Router(),
+	}
+	addr, exists := os.LookupEnv("ADDRESS")
+	if !exists {
+		srv.Addr = defaultAddress
+	} else {
+		srv.Addr = addr
 	}
 	log.Println("Server started")
 	err := srv.ListenAndServe()

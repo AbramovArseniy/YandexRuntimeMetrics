@@ -60,7 +60,7 @@ func TestSendCounter(t *testing.T) {
 
 			defer srv.Close()
 
-			err = a.sender.SendCounter(metric)
+			err = a.SendCounter(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendCounter() error = %v, expectError %v", err, test.expectError)
 				return
@@ -117,7 +117,7 @@ func TestSendGauge(t *testing.T) {
 
 			defer srv.Close()
 
-			err = a.sender.SendGauge(metric)
+			err = a.SendGauge(metric)
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendGauge() error = %v, expectError %v", err, test.expectError)
 				return

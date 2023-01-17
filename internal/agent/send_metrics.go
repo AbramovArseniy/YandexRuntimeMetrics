@@ -33,6 +33,7 @@ func NewSender() *metricSender {
 type Agent struct {
 	sender    *metricSender
 	collector *metricCollector
+	Address   string
 }
 
 func NewAgent() *Agent {
@@ -42,7 +43,7 @@ func NewAgent() *Agent {
 	}
 }
 
-func (s *metricSender) SendGauge(metric Gauge) error {
+func (a *Agent) SendGauge(metric Gauge) error {
 	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
 	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","value":%f}`, metric.metricName, "gauge", metric.metricValue))
 	req, err := http.NewRequest("POST", url, body)
@@ -52,7 +53,7 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 	}
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.client.Do(req)
+	resp, err := a.sender.client.Do(req)
 
 	if err != nil {
 		log.Println("client.Do error")
@@ -61,7 +62,7 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 	return resp.Body.Close()
 }
 
-func (s *metricSender) SendCounter(metric Counter) error {
+func (a *Agent) SendCounter(metric Counter) error {
 	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
 	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","delta":%d}`, metric.metricName, "counter", metric.metricValue))
 	req, err := http.NewRequest("POST", url, body)
@@ -71,7 +72,7 @@ func (s *metricSender) SendCounter(metric Counter) error {
 	}
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := s.client.Do(req)
+	resp, err := a.sender.client.Do(req)
 	if err != nil {
 		log.Println("client.Do error")
 		return err
@@ -83,7 +84,7 @@ func (a *Agent) SendAllMetrics() {
 	newMetrics := a.collector.CollectRandomValueMetric()
 	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
 	for _, metric := range a.collector.GaugeMetrics {
-		err := a.sender.SendGauge(metric)
+		err := a.SendGauge(metric)
 		if err != nil {
 			log.Println("can't send Gauge " + err.Error())
 			return
@@ -92,7 +93,7 @@ func (a *Agent) SendAllMetrics() {
 	log.Println("Sent Gauge")
 	metricCounter := Counter{metricName: "PollCount", metricValue: a.collector.PollCount}
 	a.collector.PollCount = 0
-	err := a.sender.SendCounter(metricCounter)
+	err := a.SendCounter(metricCounter)
 	if err != nil {
 		log.Println("can't send Counter " + err.Error())
 		return
