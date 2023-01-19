@@ -57,12 +57,12 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 		MType: "gauge",
 		Value: &metric.metricValue,
 	}
-	byteJson, err := json.Marshal(m)
+	byteJSON, err := json.Marshal(m)
 	if err != nil {
 		log.Println("json Marshal error")
 		return err
 	}
-	body := strings.NewReader(string(byteJson))
+	body := strings.NewReader(string(byteJSON))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		log.Println("Request Creation error")
@@ -86,12 +86,12 @@ func (s *metricSender) SendCounter(metric Counter) error {
 		MType: "counter",
 		Delta: &metric.metricValue,
 	}
-	byteJson, err := json.Marshal(m)
+	byteJSON, err := json.Marshal(m)
 	if err != nil {
 		log.Println("json Marshal error")
 		return err
 	}
-	body := strings.NewReader(string(byteJson))
+	body := strings.NewReader(string(byteJSON))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		log.Println("Request Creation error")
