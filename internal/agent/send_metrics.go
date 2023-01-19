@@ -3,12 +3,20 @@ package agent
 import (
 	//"fmt"
 	//"log"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	//"strings"
 )
+
+type Metrics struct {
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
+}
 
 type Gauge struct {
 	metricName  string
@@ -44,7 +52,17 @@ func NewAgent() *Agent {
 
 func (s *metricSender) SendGauge(metric Gauge) error {
 	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
-	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","value":%f}`, metric.metricName, "gauge", metric.metricValue))
+	m := Metrics{
+		ID:    metric.metricName,
+		MType: "gauge",
+		Value: &metric.metricValue,
+	}
+	byteJson, err := json.Marshal(m)
+	if err != nil {
+		log.Println("json Marshal error")
+		return err
+	}
+	body := strings.NewReader(string(byteJson))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		log.Println("Request Creation error")
@@ -63,7 +81,17 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 
 func (s *metricSender) SendCounter(metric Counter) error {
 	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
-	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","delta":%d}`, metric.metricName, "counter", metric.metricValue))
+	m := Metrics{
+		ID:    metric.metricName,
+		MType: "counter",
+		Delta: &metric.metricValue,
+	}
+	byteJson, err := json.Marshal(m)
+	if err != nil {
+		log.Println("json Marshal error")
+		return err
+	}
+	body := strings.NewReader(string(byteJson))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		log.Println("Request Creation error")
