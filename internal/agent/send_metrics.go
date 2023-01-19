@@ -71,6 +71,7 @@ func (s *metricSender) SendGauge(metric Gauge) error {
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req)
+	resp.Close = true
 
 	if err != nil {
 		log.Println("client.Do error")
@@ -100,6 +101,7 @@ func (s *metricSender) SendCounter(metric Counter) error {
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := s.client.Do(req)
+	resp.Close = true
 	if err != nil {
 		log.Println("client.Do error")
 		return err
