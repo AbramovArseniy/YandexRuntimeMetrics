@@ -46,6 +46,7 @@ type Agent struct {
 
 func NewAgent() *Agent {
 	return &Agent{
+		Address:   "localhost:8080",
 		sender:    NewSender(),
 		collector: newCollector(),
 	}
