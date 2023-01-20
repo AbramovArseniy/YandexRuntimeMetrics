@@ -119,28 +119,28 @@ func TestJSONHandlers(t *testing.T) {
 	}{
 		{
 			name:   "200 Success JSON update gauge number with dot",
-			URL:    "/update",
+			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"Alloc","type":"gauge","value":200.10}`,
 			want:   want{code: 200},
 		},
 		{
 			name:   "200 Success JSON update gauge number without dot",
-			URL:    "/update",
+			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"Alloc","type":"gauge","value":200}`,
 			want:   want{code: 200},
 		},
 		{
 			name:   "200 Success JSON update counter",
-			URL:    "/update",
+			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"PollCount","type":"counter","delta":5}`,
 			want:   want{code: 200},
 		},
 		{
 			name:   "200 Success JSON Get counter",
-			URL:    "/value",
+			URL:    "/value/",
 			method: http.MethodPost,
 			body:   `{"id":"PollCount","type":"counter"}`,
 			want: want{code: 200,
@@ -149,7 +149,7 @@ func TestJSONHandlers(t *testing.T) {
 		},
 		{
 			name:   "200 Success JSON get gauge",
-			URL:    "/value",
+			URL:    "/value/",
 			method: http.MethodPost,
 			body:   `{"id":"Alloc","type":"gauge"}`,
 			want: want{
@@ -159,28 +159,28 @@ func TestJSONHandlers(t *testing.T) {
 		},
 		{
 			name:   "400 JSON update gauge parse error",
-			URL:    "/update",
+			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"stringMetric","type":"gauge","value":"aaa"}`,
 			want:   want{code: 400},
 		},
 		{
 			name:   "400 JSON update counter parse error",
-			URL:    "/update",
+			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"PollCounter","type":"counter","delta":11.12}`,
 			want:   want{code: 400},
 		},
 		{
 			name:   "501 JSON post: wrong metric type",
-			URL:    "/update",
+			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"name","type":"wrongType","value":123}`,
 			want:   want{code: 501},
 		},
 		{
 			name:   "404 JSON get no such gauge",
-			URL:    "/value",
+			URL:    "/value/",
 			method: http.MethodPost,
 			body:   `{"id":"wrongGauge2121331","type":"gauge"}`,
 			want: want{code: 404,
@@ -188,7 +188,7 @@ func TestJSONHandlers(t *testing.T) {
 		},
 		{
 			name:   "404 JSON get no such counter",
-			URL:    "/value",
+			URL:    "/value/",
 			method: http.MethodPost,
 			body:   `{"id":"asdasda","type":"counter"}`,
 			want: want{code: 404,
