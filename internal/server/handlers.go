@@ -166,6 +166,7 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 	case "counter":
 		val, isIn := h.storage.CounterMetrics[m.ID]
 		if !isIn {
+			log.Println("There is no metric you requested")
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			return
 		}
@@ -173,11 +174,13 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 	case "gauge":
 		val, isIn := h.storage.GaugeMetrics[m.ID]
 		if !isIn {
+			log.Println("There is no metric you requested")
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			return
 		}
 		m.Value = &val
 	default:
+		log.Println("There is no metric you requested")
 		http.Error(rw, "There is no metric You requested", http.StatusNotFound)
 		return
 	}
@@ -201,13 +204,11 @@ func (h *Handler) storeMetrics(m Metrics) error {
 		if m.Value == nil {
 			return errors.New("no value in update request")
 		}
-		log.Printf("saving metric %s %s %f\n", m.ID, m.MType, *m.Value)
 		h.storage.GaugeMetrics[m.ID] = *m.Value
 	case "counter":
 		if m.Delta == nil {
 			return errors.New("no value in update request")
 		}
-		log.Printf("saving metric %s %s %d\n", m.ID, m.MType, *m.Delta)
 		h.storage.CounterMetrics[m.ID] += *m.Delta
 	default:
 		return errors.New("no such type of metric")

@@ -50,6 +50,7 @@ func (a *Agent) CollectRuntimeMetrics() {
 		{metricName: "StackInuse", metricValue: float64(stats.StackInuse)},
 		{metricName: "StackSys", metricValue: float64(stats.StackSys)},
 		{metricName: "Sys", metricValue: float64(stats.Sys)},
+		{metricName: "TotalAlloc", metricValue: float64(stats.TotalAlloc)},
 	}
 	log.Println("Collected GaugeMetrics")
 }
