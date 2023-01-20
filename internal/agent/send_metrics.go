@@ -52,7 +52,7 @@ func NewAgent() *Agent {
 }
 
 func (a *Agent) SendGauge(metric Gauge) error {
-	url := fmt.Sprintf("https://%s/update/", a.Address)
+	url := fmt.Sprintf("http://%s/update/", a.Address)
 	m := Metrics{
 		ID:    metric.metricName,
 		MType: "gauge",
@@ -81,7 +81,7 @@ func (a *Agent) SendGauge(metric Gauge) error {
 }
 
 func (a *Agent) SendCounter(metric Counter) error {
-	url := fmt.Sprintf("https://%s/update/", a.Address)
+	url := fmt.Sprintf("http://%s/update/", a.Address)
 	m := Metrics{
 		ID:    metric.metricName,
 		MType: "counter",
