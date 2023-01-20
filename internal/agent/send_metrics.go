@@ -3,12 +3,20 @@ package agent
 import (
 	//"fmt"
 	//"log"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"strings"
 	//"strings"
 )
+
+type Metrics struct {
+	ID    string   `json:"id"`
+	MType string   `json:"type"`
+	Delta *int64   `json:"delta,omitempty"`
+	Value *float64 `json:"value,omitempty"`
+}
 
 type Gauge struct {
 	metricName  string
@@ -44,27 +52,47 @@ func NewAgent() *Agent {
 }
 
 func (a *Agent) SendGauge(metric Gauge) error {
-	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
-	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","value":%f}`, metric.metricName, "gauge", metric.metricValue))
+	url := fmt.Sprintf("%s/update/", a.Address)
+	m := Metrics{
+		ID:    metric.metricName,
+		MType: "gauge",
+		Value: &metric.metricValue,
+	}
+	byteJSON, err := json.Marshal(m)
+	if err != nil {
+		log.Println("json Marshal error")
+		return err
+	}
+	body := strings.NewReader(string(byteJSON))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		log.Println("Request Creation error")
 		return err
 	}
+	log.Println(body)
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.sender.client.Do(req)
 
 	if err != nil {
-		log.Println("client.Do error")
 		return err
 	}
 	return resp.Body.Close()
 }
 
 func (a *Agent) SendCounter(metric Counter) error {
-	url := fmt.Sprintf("%s%s:%s/update", DefaultProtocol, DefaultHost, DefaultPort)
-	body := strings.NewReader(fmt.Sprintf(`{"id":"%s","type":"%s","delta":%d}`, metric.metricName, "counter", metric.metricValue))
+	url := fmt.Sprintf("%s/update/", a.Address)
+	m := Metrics{
+		ID:    metric.metricName,
+		MType: "counter",
+		Delta: &metric.metricValue,
+	}
+	byteJSON, err := json.Marshal(m)
+	if err != nil {
+		log.Println("json Marshal error")
+		return err
+	}
+	body := strings.NewReader(string(byteJSON))
 	req, err := http.NewRequest("POST", url, body)
 	if err != nil {
 		log.Println("Request Creation error")
@@ -74,7 +102,7 @@ func (a *Agent) SendCounter(metric Counter) error {
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.sender.client.Do(req)
 	if err != nil {
-		log.Println("client.Do error")
+		log.Println(body)
 		return err
 	}
 	return resp.Body.Close()
