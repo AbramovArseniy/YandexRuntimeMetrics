@@ -90,7 +90,8 @@ func TestGetMetricHandler(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	server := httptest.NewServer(Router())
+	s := Server{}
+	server := httptest.NewServer(s.Router())
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -195,7 +196,8 @@ func TestJSONHandlers(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	server := httptest.NewServer(Router())
+	s := Server{}
+	server := httptest.NewServer(s.Router())
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

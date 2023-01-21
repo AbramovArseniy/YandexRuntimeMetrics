@@ -8,15 +8,8 @@ import (
 	"time"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent"
-	"github.com/joho/godotenv"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 )
-
-func init() {
-	// loads values from .env into the system
-	if err := godotenv.Load(); err != nil {
-		log.Print("No .env file found")
-	}
-}
 
 const (
 	defaultPollInterval   = 2 * time.Second
@@ -48,8 +41,8 @@ func main() {
 	}
 	a := agent.NewAgent()
 	a.Address = address
-	go agent.Repeat(a.CollectRuntimeMetrics, pollInterval)
-	go agent.Repeat(a.SendAllMetrics, reportInterval)
+	go repeating.Repeat(a.CollectRuntimeMetrics, pollInterval)
+	go repeating.Repeat(a.SendAllMetrics, reportInterval)
 	log.Println("Agent started")
 	cancelSignal := make(chan os.Signal, 1)
 	signal.Notify(cancelSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
