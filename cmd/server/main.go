@@ -13,13 +13,6 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
 )
 
-const (
-	defaultAddress       = "localhost:8080"
-	defaultStoreInterval = 300
-	defaultStoreFile     = "/tmp/devops-metrics-db.json"
-	defaultRestore       = true
-)
-
 func initFlags(s *server.Server) {
 	flag.BoolVar(&s.FileHandler.Restore, "r", true, "Restore")
 	flag.StringVar(&s.FileHandler.StoreFile, "f", "/tmp/devops-metrics-db.json", "storeFile")
@@ -33,7 +26,7 @@ func StartServer() {
 	initFlags(s)
 	addr, exists := os.LookupEnv("ADDRESS")
 	if !exists {
-		s.Addr = defaultAddress
+		flag.Parse()
 	} else {
 		s.Addr = addr
 	}
@@ -49,7 +42,7 @@ func StartServer() {
 	} else {
 		var err error
 		if s.FileHandler.StoreInterval, err = strconv.Atoi(strStoreInterval); err != nil {
-			log.Println("couldn't parse store interval")
+			log.Println("couldn't parse store interval:", err, strStoreInterval)
 			flag.Parse()
 		}
 	}
