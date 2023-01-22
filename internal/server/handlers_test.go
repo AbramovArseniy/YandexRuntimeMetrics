@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -90,7 +91,7 @@ func TestGetMetricHandler(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	s := Server{}
+	s := NewServer()
 	server := httptest.NewServer(s.Router())
 	defer server.Close()
 	for _, tt := range tests {
@@ -123,21 +124,24 @@ func TestJSONHandlers(t *testing.T) {
 			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"Alloc","type":"gauge","value":200.10}`,
-			want:   want{code: 200},
+			want: want{code: 200,
+				body: []string{`{"id":"Alloc","type":"gauge","value":200.1}`}},
 		},
 		{
 			name:   "200 Success JSON update gauge number without dot",
 			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"Alloc","type":"gauge","value":200}`,
-			want:   want{code: 200},
+			want: want{code: 200,
+				body: []string{`{"id":"Alloc","type":"gauge","value":200}`}},
 		},
 		{
 			name:   "200 Success JSON update counter",
 			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"PollCount","type":"counter","delta":5}`,
-			want:   want{code: 200},
+			want: want{code: 200,
+				body: []string{`{"id":"PollCount","type":"counter","delta":5}`}},
 		},
 		{
 			name:   "200 Success JSON Get counter",
@@ -196,11 +200,12 @@ func TestJSONHandlers(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	s := Server{}
+	s := NewServer()
 	server := httptest.NewServer(s.Router())
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			log.Println(s.handler.storage)
 			resp, body := RunRequest(t, server, tt.method, tt.URL, tt.body, "application/json")
 			defer resp.Body.Close()
 			assert.Equal(t, tt.want.code, resp.StatusCode)

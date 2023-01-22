@@ -70,7 +70,6 @@ func (a *Agent) SendGauge(metric Gauge) error {
 		log.Println("Request Creation error")
 		return err
 	}
-	log.Println(body)
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := a.sender.client.Do(req)

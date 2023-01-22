@@ -2,12 +2,10 @@ package repeating
 
 import "time"
 
-func Repeat(action func(), interval time.Duration) *time.Ticker {
+func Repeat(action func(), interval time.Duration) {
 	ticker := time.NewTicker(interval)
-	go func() {
-		for range ticker.C {
-			action()
-		}
-	}()
-	return ticker
+	for {
+		<-ticker.C
+		action()
+	}
 }

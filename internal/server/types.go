@@ -13,8 +13,8 @@ type MemStorage struct {
 }
 
 type Server struct {
-	handler     Handler
-	FileHandler FileHandler
+	handler   Handler
+	StoreFile string
 }
 
 func NewServer() *Server {
@@ -25,6 +25,6 @@ func NewServer() *Server {
 				GaugeMetrics:   make(map[string]float64),
 			},
 		},
-		FileHandler: FileHandler{},
+		StoreFile: "",
 	}
 }
