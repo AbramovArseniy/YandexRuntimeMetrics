@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"log"
 	"net/http"
 	"os"
@@ -14,55 +15,63 @@ import (
 
 const (
 	defaultAddress       = "localhost:8080"
-	defaultStoreInterval = 300 * time.Second
+	defaultStoreInterval = 300
 	defaultStoreFile     = "/tmp/devops-metrics-db.json"
 	defaultRestore       = true
 )
 
+func initFlags(s *server.Server) {
+	flag.BoolVar(&s.FileHandler.Restore, "r", true, "Restore")
+	flag.StringVar(&s.FileHandler.StoreFile, "f", "/tmp/devops-metrics-db.json", "storeFile")
+	flag.StringVar(&s.Addr, "a", "localhost:8080", "address")
+	flag.IntVar(&s.FileHandler.StoreInterval, "i", 300, "time_in_seconds")
+	flag.Parse()
+}
+
 func StartServer() {
 	s := server.NewServer()
-	srv := &http.Server{
-		Handler: s.Router(),
-	}
+	initFlags(s)
 	addr, exists := os.LookupEnv("ADDRESS")
 	if !exists {
-		srv.Addr = defaultAddress
+		s.Addr = defaultAddress
 	} else {
-		srv.Addr = addr
+		s.Addr = addr
 	}
-	var storeInterval time.Duration
-	if s.StoreFile, exists = os.LookupEnv("STORE_FILE"); !exists {
-		s.StoreFile = defaultStoreFile
+	srv := &http.Server{
+		Handler: s.Router(),
+		Addr:    s.Addr,
+	}
+	if s.FileHandler.StoreFile, exists = os.LookupEnv("STORE_FILE"); !exists {
+		flag.Parse()
 	}
 	if strStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); !exists {
-		storeInterval = defaultStoreInterval
+		flag.Parse()
 	} else {
 		var err error
-		if storeInterval, err = time.ParseDuration(strStoreInterval); err != nil {
+		if s.FileHandler.StoreInterval, err = strconv.Atoi(strStoreInterval); err != nil {
 			log.Println("couldn't parse store interval")
-			storeInterval = defaultStoreInterval
+			flag.Parse()
 		}
 	}
-	var Restore bool
 	if strRestore, exists := os.LookupEnv("RESTORE"); !exists {
-		Restore = defaultRestore
+		flag.Parse()
 	} else {
 		var err error
-		if Restore, err = strconv.ParseBool(strRestore); err != nil {
+		if s.FileHandler.Restore, err = strconv.ParseBool(strRestore); err != nil {
 			log.Println("couldn't parse restore bool")
-			Restore = defaultRestore
+			flag.Parse()
 		}
 	}
-	if strings.LastIndex(s.StoreFile, "/") != -1 {
-		if err := os.MkdirAll(s.StoreFile[:strings.LastIndex(s.StoreFile, "/")], 0777); err != nil {
+	if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
+		if err := os.MkdirAll(s.FileHandler.StoreFile[:strings.LastIndex(s.FileHandler.StoreFile, "/")], 0777); err != nil {
 			log.Println("failed to create directory:", err)
 		}
 	}
-	if Restore {
+	if s.FileHandler.Restore {
 		s.RestoreMetricsFromFile()
 	}
 	log.Println("Server started")
-	go repeating.Repeat(s.StoreMetricsToFile, storeInterval)
+	go repeating.Repeat(s.StoreMetricsToFile, time.Duration(s.FileHandler.StoreInterval)*time.Second)
 	err := srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)

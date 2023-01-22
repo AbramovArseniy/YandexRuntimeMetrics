@@ -7,18 +7,6 @@ import (
 	"time"
 )
 
-type metricCollector struct {
-	GaugeMetrics []Gauge
-	PollCount    int64
-}
-
-func newCollector() *metricCollector {
-	return &metricCollector{
-		GaugeMetrics: make([]Gauge, 0),
-		PollCount:    0,
-	}
-}
-
 func (a *Agent) CollectRuntimeMetrics() {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)

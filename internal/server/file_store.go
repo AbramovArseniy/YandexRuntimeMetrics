@@ -8,10 +8,10 @@ import (
 )
 
 func (s *Server) StoreMetricsToFile() {
-	file, err := os.OpenFile(s.StoreFile, os.O_WRONLY|os.O_CREATE, 0777)
+	file, err := os.OpenFile(s.FileHandler.StoreFile, os.O_WRONLY|os.O_CREATE, 0777)
 	writer := bufio.NewWriter(file)
 	if err != nil {
-		log.Printf("Failed to open file: %s", s.StoreFile)
+		log.Printf("Failed to open file: %s", s.FileHandler.StoreFile)
 	}
 	defer file.Close()
 	for name, value := range s.handler.storage.CounterMetrics {
@@ -66,10 +66,10 @@ func (s *Server) StoreMetricsToFile() {
 }
 
 func (s *Server) RestoreMetricsFromFile() {
-	file, err := os.OpenFile(s.StoreFile, os.O_RDONLY|os.O_CREATE, 0777)
+	file, err := os.OpenFile(s.FileHandler.StoreFile, os.O_RDONLY|os.O_CREATE, 0777)
 	scanner := bufio.NewScanner(file)
 	if err != nil {
-		log.Printf("Failed to open file: %s, %v", s.StoreFile, err)
+		log.Printf("Failed to open file: %s, %v", s.FileHandler.StoreFile, err)
 	}
 	defer file.Close()
 	for scanner.Scan() {
@@ -82,5 +82,5 @@ func (s *Server) RestoreMetricsFromFile() {
 		log.Println(m)
 		s.handler.storeMetrics(m)
 	}
-	log.Printf("Restored Metrics from '%s'", s.StoreFile)
+	log.Printf("Restored Metrics from '%s'", s.FileHandler.StoreFile)
 }
