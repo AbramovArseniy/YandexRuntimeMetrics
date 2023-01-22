@@ -31,7 +31,7 @@ func StartServer() {
 		srv.Addr = addr
 	}
 	var storeInterval time.Duration
-	if s.StoreFile, exists = os.LookupEnv("ADDRESS"); !exists {
+	if s.StoreFile, exists = os.LookupEnv("STORE_FILE"); !exists {
 		s.StoreFile = defaultStoreFile
 	}
 	if strStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); !exists {
@@ -53,8 +53,10 @@ func StartServer() {
 			Restore = defaultRestore
 		}
 	}
-	if err := os.MkdirAll(s.StoreFile[:strings.LastIndex(s.StoreFile, "/")], 0777); err != nil {
-		log.Println("failed to create directory:", err)
+	if strings.LastIndex(s.StoreFile, "/") != -1 {
+		if err := os.MkdirAll(s.StoreFile[:strings.LastIndex(s.StoreFile, "/")], 0777); err != nil {
+			log.Println("failed to create directory:", err)
+		}
 	}
 	if Restore {
 		s.RestoreMetricsFromFile()
