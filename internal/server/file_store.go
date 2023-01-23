@@ -79,7 +79,6 @@ func (s *Server) RestoreMetricsFromFile() {
 			log.Printf("json Unmarshal error: %v", err)
 			return
 		}
-		log.Println(m)
 		s.handler.storeMetrics(m)
 	}
 	log.Printf("Restored Metrics from '%s'", s.FileHandler.StoreFile)

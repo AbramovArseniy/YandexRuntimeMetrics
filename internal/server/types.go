@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"time"
 )
 
 type Metrics struct {
@@ -17,7 +18,7 @@ type MemStorage struct {
 }
 
 type fileHandler struct {
-	StoreInterval int
+	StoreInterval time.Duration
 	StoreFile     string
 	Restore       bool
 }

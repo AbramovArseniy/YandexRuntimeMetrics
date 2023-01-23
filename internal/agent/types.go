@@ -1,6 +1,9 @@
 package agent
 
-import "net/http"
+import (
+	"net/http"
+	"time"
+)
 
 type Metrics struct {
 	ID    string   `json:"id"`
@@ -45,8 +48,8 @@ type Agent struct {
 	sender         *metricSender
 	collector      *metricCollector
 	Address        string
-	PollInterval   int
-	ReportInterval int
+	PollInterval   time.Duration
+	ReportInterval time.Duration
 }
 
 func NewAgent() *Agent {
@@ -54,7 +57,7 @@ func NewAgent() *Agent {
 		Address:        "localhost:8080",
 		sender:         NewSender(),
 		collector:      newCollector(),
-		PollInterval:   2,
-		ReportInterval: 10,
+		PollInterval:   2 * time.Second,
+		ReportInterval: 10 * time.Second,
 	}
 }

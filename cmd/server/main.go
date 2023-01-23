@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultAddress       = "localhost:8080"
-	defaultStoreInterval = 300
+	defaultStoreInterval = 300 * time.Second
 	defaultStoreFile     = "/tmp/devops-metrics-db.json"
 	defaultRestore       = true
 )
@@ -29,12 +29,12 @@ func StartServer() {
 		flagRestore       bool
 		flagStoreFile     string
 		flagAddress       string
-		flagStoreInterval int
+		flagStoreInterval time.Duration
 	)
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
 	flag.StringVar(&flagStoreFile, "f", defaultStoreFile, "store_file")
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
-	flag.IntVar(&flagStoreInterval, "i", defaultStoreInterval, "store_interval_in_seconds")
+	flag.DurationVar(&flagStoreInterval, "i", defaultStoreInterval, "store_interval_in_seconds")
 	flag.Parse()
 	addr, exists := os.LookupEnv("ADDRESS")
 	if !exists {
@@ -49,7 +49,7 @@ func StartServer() {
 		s.FileHandler.StoreInterval = flagStoreInterval
 	} else {
 		var err error
-		if s.FileHandler.StoreInterval, err = strconv.Atoi(strStoreInterval); err != nil {
+		if s.FileHandler.StoreInterval, err = time.ParseDuration(strStoreInterval); err != nil {
 			log.Println("couldn't parse store interval")
 			s.FileHandler.StoreInterval = flagStoreInterval
 		}
@@ -72,7 +72,7 @@ func StartServer() {
 		s.RestoreMetricsFromFile()
 	}
 	log.Println("Server started")
-	go repeating.Repeat(s.StoreMetricsToFile, time.Duration(s.FileHandler.StoreInterval)*time.Second)
+	go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	err := srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		log.Fatal(err)
