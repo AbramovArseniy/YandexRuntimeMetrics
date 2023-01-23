@@ -26,37 +26,41 @@ func StartServer() {
 		Handler: s.Router(),
 	}
 	var (
-		flagRestore       *bool   = flag.Bool("r", defaultRestore, "restore_true/false")
-		flagStoreFile     *string = flag.String("f", defaultStoreFile, "store_file")
-		flagAddress       *string = flag.String("a", defaultAddress, "server_address")
-		flagStoreInterval *int    = flag.Int("i", defaultStoreInterval, "store_interval_in_seconds")
+		flagRestore       bool
+		flagStoreFile     string
+		flagAddress       string
+		flagStoreInterval int
 	)
+	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
+	flag.StringVar(&flagStoreFile, "f", defaultStoreFile, "store_file")
+	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
+	flag.IntVar(&flagStoreInterval, "i", defaultStoreInterval, "store_interval_in_seconds")
 	flag.Parse()
 	addr, exists := os.LookupEnv("ADDRESS")
 	if !exists {
-		srv.Addr = *flagAddress
+		srv.Addr = flagAddress
 	} else {
 		srv.Addr = addr
 	}
 	if s.FileHandler.StoreFile, exists = os.LookupEnv("STORE_FILE"); !exists {
-		s.FileHandler.StoreFile = *flagStoreFile
+		s.FileHandler.StoreFile = flagStoreFile
 	}
 	if strStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); !exists {
-		s.FileHandler.StoreInterval = *flagStoreInterval
+		s.FileHandler.StoreInterval = flagStoreInterval
 	} else {
 		var err error
 		if s.FileHandler.StoreInterval, err = strconv.Atoi(strStoreInterval); err != nil {
 			log.Println("couldn't parse store interval")
-			s.FileHandler.StoreInterval = *flagStoreInterval
+			s.FileHandler.StoreInterval = flagStoreInterval
 		}
 	}
 	if strRestore, exists := os.LookupEnv("RESTORE"); !exists {
-		s.FileHandler.Restore = *flagRestore
+		s.FileHandler.Restore = flagRestore
 	} else {
 		var err error
 		if s.FileHandler.Restore, err = strconv.ParseBool(strRestore); err != nil {
 			log.Println("couldn't parse restore bool")
-			s.FileHandler.Restore = *flagRestore
+			s.FileHandler.Restore = flagRestore
 		}
 	}
 	if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
