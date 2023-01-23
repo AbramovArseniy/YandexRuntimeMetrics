@@ -13,46 +13,50 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
 )
 
-func initFlags(s *server.Server) {
-	flag.BoolVar(&s.FileHandler.Restore, "r", true, "Restore")
-	flag.StringVar(&s.FileHandler.StoreFile, "f", "/tmp/devops-metrics-db.json", "storeFile")
-	flag.StringVar(&s.Addr, "a", "localhost:8080", "address")
-	flag.IntVar(&s.FileHandler.StoreInterval, "i", 300, "time_in_seconds")
-	flag.Parse()
-}
+const (
+	defaultAddress       = "localhost:8080"
+	defaultStoreInterval = 300
+	defaultStoreFile     = "/tmp/devops-metrics-db.json"
+	defaultRestore       = true
+)
 
 func StartServer() {
 	s := server.NewServer()
-	initFlags(s)
-	addr, exists := os.LookupEnv("ADDRESS")
-	if !exists {
-		flag.Parse()
-	} else {
-		s.Addr = addr
-	}
 	srv := &http.Server{
 		Handler: s.Router(),
-		Addr:    s.Addr,
+	}
+	var (
+		flagRestore       *bool   = flag.Bool("r", defaultRestore, "restore_true/false")
+		flagStoreFile     *string = flag.String("f", defaultStoreFile, "store_file")
+		flagAddress       *string = flag.String("a", defaultAddress, "server_address")
+		flagStoreInterval *int    = flag.Int("i", defaultStoreInterval, "store_interval_in_seconds")
+	)
+	flag.Parse()
+	addr, exists := os.LookupEnv("ADDRESS")
+	if !exists {
+		srv.Addr = *flagAddress
+	} else {
+		srv.Addr = addr
 	}
 	if s.FileHandler.StoreFile, exists = os.LookupEnv("STORE_FILE"); !exists {
-		flag.Parse()
+		s.FileHandler.StoreFile = *flagStoreFile
 	}
 	if strStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); !exists {
-		flag.Parse()
+		s.FileHandler.StoreInterval = *flagStoreInterval
 	} else {
 		var err error
 		if s.FileHandler.StoreInterval, err = strconv.Atoi(strStoreInterval); err != nil {
-			log.Println("couldn't parse store interval:", err, strStoreInterval)
-			flag.Parse()
+			log.Println("couldn't parse store interval")
+			s.FileHandler.StoreInterval = *flagStoreInterval
 		}
 	}
 	if strRestore, exists := os.LookupEnv("RESTORE"); !exists {
-		flag.Parse()
+		s.FileHandler.Restore = *flagRestore
 	} else {
 		var err error
 		if s.FileHandler.Restore, err = strconv.ParseBool(strRestore); err != nil {
 			log.Println("couldn't parse restore bool")
-			flag.Parse()
+			s.FileHandler.Restore = *flagRestore
 		}
 	}
 	if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
