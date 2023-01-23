@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"time"
 )
 
@@ -44,8 +43,4 @@ func NewServer() *Server {
 			Restore:       true,
 		},
 	}
-}
-
-func (s Server) String() string {
-	return fmt.Sprintf("Storage: %v \file Storing:%v", s.handler.storage, s.FileHandler)
 }
