@@ -55,10 +55,19 @@ func Compress(data []byte) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
+func GetGaugeStatusOK(rw http.ResponseWriter, r *http.Request, metricVal float64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
 	strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		byteVal, err := Compress([]byte(strVal))
+		rw.Header().Set("Content-Encoding", "gzip")
+		if err != nil {
+			log.Printf("compress error: %v", err)
+			return
+		}
+		strVal = string(byteVal)
+	}
 	_, err := rw.Write([]byte(strVal))
 	if err != nil {
 		log.Println(err)
@@ -66,24 +75,72 @@ func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 	}
 }
 
-func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
+func GetCounterStatusOK(rw http.ResponseWriter, r *http.Request, metricVal int64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
-	_, err := rw.Write([]byte(fmt.Sprintf("%d", metricVal)))
-	if err != nil {
-		log.Println(err)
-		return
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		byteVal := []byte(fmt.Sprintf("%d", metricVal))
+		byteVal, err := Compress(byteVal)
+		rw.Header().Set("Content-Encoding", "gzip")
+		if err != nil {
+			log.Printf("compress error: %v", err)
+			return
+		}
+		_, err = rw.Write([]byte(string(byteVal)))
+		if err != nil {
+			log.Println(err)
+			return
+		}
+	} else {
+		_, err := rw.Write([]byte(fmt.Sprintf("%d", metricVal)))
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
+
 }
 
-func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, _ *http.Request) {
+func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	log.Println("Get all request")
 	for metricName, metricVal := range h.storage.GaugeMetrics {
 		strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
-		rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			byteVal, err := Compress([]byte(strVal))
+			rw.Header().Set("Content-Encoding", "gzip")
+			if err != nil {
+				log.Printf("compress error: %v", err)
+				return
+			}
+			strVal = string(byteVal)
+		}
+		_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 	for metricName, metricVal := range h.storage.CounterMetrics {
-		rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
+		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			byteVal := []byte(fmt.Sprintf("%d", metricVal))
+			byteVal, err := Compress(byteVal)
+			rw.Header().Set("Content-Encoding", "gzip")
+			if err != nil {
+				log.Printf("compress error: %v", err)
+				return
+			}
+			_, err = rw.Write([]byte(fmt.Sprintf("%s: %s", metricName, string(byteVal))))
+			if err != nil {
+				log.Println(err)
+				return
+			}
+		} else {
+			_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
+			if err != nil {
+				log.Println(err)
+				return
+			}
+		}
 	}
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
@@ -119,14 +176,14 @@ func (h *Handler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	switch metricType {
 	case "gauge":
 		if metricVal, isIn := h.storage.GaugeMetrics[metricName]; isIn {
-			GetGaugeStatusOK(rw, metricVal)
+			GetGaugeStatusOK(rw, r, metricVal)
 		} else {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 		}
 
 	case "counter":
 		if metricVal, isIn := h.storage.CounterMetrics[metricName]; isIn {
-			GetCounterStatusOK(rw, metricVal)
+			GetCounterStatusOK(rw, r, metricVal)
 		} else {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 		}
