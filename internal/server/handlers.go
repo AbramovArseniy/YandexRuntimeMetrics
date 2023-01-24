@@ -142,7 +142,7 @@ func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) 
 		}
 	}
 	rw.WriteHeader(http.StatusOK)
-	rw.Header().Add("Content-Type", "text/html")
+	rw.Header().Add("Content-Type", "html/text")
 }
 
 func (h *Handler) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
