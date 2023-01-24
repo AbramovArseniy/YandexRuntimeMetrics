@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"errors"
@@ -35,6 +36,23 @@ func DecompressHandler(next http.Handler) http.Handler {
 		}
 	})
 
+}
+
+func Compress(data []byte) ([]byte, error) {
+	var b bytes.Buffer
+	w, err := gzip.NewWriterLevel(&b, gzip.BestCompression)
+	if err != nil {
+		return nil, fmt.Errorf("failed init compress writer: %v", err)
+	}
+	_, err = w.Write(data)
+	if err != nil {
+		return nil, fmt.Errorf("failed write data to compress temporary buffer: %v", err)
+	}
+	err = w.Close()
+	if err != nil {
+		return nil, fmt.Errorf("failed compress data: %v", err)
+	}
+	return b.Bytes(), nil
 }
 
 func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
@@ -208,12 +226,21 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 		log.Printf("json Marshal error: %s", err)
 		return
 	}
+	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+		jsonMetric, err = Compress(jsonMetric)
+		rw.Header().Set("Content-Encoding", "gzip")
+		if err != nil {
+			log.Printf("compress error: %v", err)
+			return
+		}
+	}
 	_, err = rw.Write(jsonMetric)
 	if err != nil {
 		http.Error(rw, "can't write body", http.StatusInternalServerError)
 		log.Println(err)
 		return
 	}
+
 	rw.WriteHeader(http.StatusOK)
 }
 
