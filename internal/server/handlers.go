@@ -19,7 +19,6 @@ const contentTypeJSON = "application/json"
 
 func DecompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		var reader io.ReadCloser
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
 			rw.Header().Set("Accept-Encoding", "gzip")
 			gz, err := gzip.NewReader(r.Body)
@@ -27,8 +26,7 @@ func DecompressHandler(next http.Handler) http.Handler {
 				http.Error(rw, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			reader = gz
-			r.Body = reader
+			r.Body = gz
 			defer gz.Close()
 			next.ServeHTTP(rw, r)
 		} else {
@@ -86,6 +84,7 @@ func GetCounterStatusOK(rw http.ResponseWriter, r *http.Request, metricVal int64
 			log.Printf("compress error: %v", err)
 			return
 		}
+		rw.Header().Set("Content-Encoding", "gzip")
 		_, err = rw.Write([]byte(string(byteVal)))
 		if err != nil {
 			log.Println(err)
