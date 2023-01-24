@@ -22,8 +22,9 @@ const (
 
 func StartServer() {
 	s := server.NewServer()
+	handler := server.DecompressHandler(s.Router())
 	srv := &http.Server{
-		Handler: s.Router(),
+		Handler: handler,
 	}
 	var (
 		flagRestore       bool

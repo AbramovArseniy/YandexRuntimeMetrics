@@ -55,6 +55,7 @@ func (a *Agent) SendGauge(metric Gauge) error {
 	}
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
 	resp, err := a.sender.client.Do(req)
 
 	if err != nil {
@@ -87,6 +88,7 @@ func (a *Agent) SendCounter(metric Counter) error {
 	}
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
 	resp, err := a.sender.client.Do(req)
 	if err != nil {
 		log.Println(body)

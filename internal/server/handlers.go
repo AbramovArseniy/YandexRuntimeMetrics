@@ -1,6 +1,7 @@
 package server
 
 import (
+	"compress/gzip"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -8,14 +9,32 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 )
 
 const contentTypeJSON = "application/json"
 
-type Handler struct {
-	storage MemStorage
+func DecompressHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		var reader io.ReadCloser
+		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
+			rw.Header().Set("Accept-Encoding", "gzip")
+			gz, err := gzip.NewReader(r.Body)
+			if err != nil {
+				http.Error(rw, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			reader = gz
+			r.Body = reader
+			defer gz.Close()
+			next.ServeHTTP(rw, r)
+		} else {
+			next.ServeHTTP(rw, r)
+		}
+	})
+
 }
 
 func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
@@ -112,7 +131,7 @@ func (h *Handler) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request)
 	var m Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		rw.WriteHeader(http.StatusBadRequest)
-		log.Println("Decode problem")
+		log.Printf("Decode problem: %v", err)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
 		if err != nil {
 			return

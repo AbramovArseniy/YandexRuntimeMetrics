@@ -16,6 +16,10 @@ type MemStorage struct {
 	GaugeMetrics   map[string]float64
 }
 
+type Handler struct {
+	storage MemStorage
+}
+
 type fileHandler struct {
 	StoreInterval time.Duration
 	StoreFile     string
