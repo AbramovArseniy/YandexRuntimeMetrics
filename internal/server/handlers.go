@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"compress/gzip"
 	"encoding/json"
 	"errors"
@@ -16,6 +15,24 @@ import (
 )
 
 const contentTypeJSON = "application/json"
+
+func CompressHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gz, err := gzip.NewWriterLevel(w, gzip.BestSpeed)
+		if err != nil {
+			io.WriteString(w, err.Error())
+			return
+		}
+		defer gz.Close()
+
+		w.Header().Set("Content-Encoding", "gzip")
+		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+	})
+}
 
 func DecompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
@@ -36,36 +53,10 @@ func DecompressHandler(next http.Handler) http.Handler {
 
 }
 
-func Compress(data []byte) ([]byte, error) {
-	var b bytes.Buffer
-	w, err := gzip.NewWriterLevel(&b, gzip.BestCompression)
-	if err != nil {
-		return nil, fmt.Errorf("failed init compress writer: %v", err)
-	}
-	_, err = w.Write(data)
-	if err != nil {
-		return nil, fmt.Errorf("failed write data to compress temporary buffer: %v", err)
-	}
-	err = w.Close()
-	if err != nil {
-		return nil, fmt.Errorf("failed compress data: %v", err)
-	}
-	return b.Bytes(), nil
-}
-
-func GetGaugeStatusOK(rw http.ResponseWriter, r *http.Request, metricVal float64) {
+func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
 	strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
-	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		byteVal, err := Compress([]byte(strVal))
-		rw.Header().Set("Content-Encoding", "gzip")
-		if err != nil {
-			log.Printf("compress error: %v", err)
-			return
-		}
-		strVal = string(byteVal)
-	}
 	_, err := rw.Write([]byte(strVal))
 	if err != nil {
 		log.Println(err)
@@ -73,29 +64,13 @@ func GetGaugeStatusOK(rw http.ResponseWriter, r *http.Request, metricVal float64
 	}
 }
 
-func GetCounterStatusOK(rw http.ResponseWriter, r *http.Request, metricVal int64) {
+func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
-	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		byteVal := []byte(fmt.Sprintf("%d", metricVal))
-		byteVal, err := Compress(byteVal)
-		rw.Header().Set("Content-Encoding", "gzip")
-		if err != nil {
-			log.Printf("compress error: %v", err)
-			return
-		}
-		rw.Header().Set("Content-Encoding", "gzip")
-		_, err = rw.Write([]byte(string(byteVal)))
-		if err != nil {
-			log.Println(err)
-			return
-		}
-	} else {
-		_, err := rw.Write([]byte(fmt.Sprintf("%d", metricVal)))
-		if err != nil {
-			log.Println(err)
-			return
-		}
+	_, err := rw.Write([]byte(fmt.Sprintf("%d", metricVal)))
+	if err != nil {
+		log.Println(err)
+		return
 	}
 
 }
@@ -104,15 +79,6 @@ func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) 
 	log.Println("Get all request")
 	for metricName, metricVal := range h.storage.GaugeMetrics {
 		strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			byteVal, err := Compress([]byte(strVal))
-			rw.Header().Set("Content-Encoding", "gzip")
-			if err != nil {
-				log.Printf("compress error: %v", err)
-				return
-			}
-			strVal = string(byteVal)
-		}
 		_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
 		if err != nil {
 			log.Println(err)
@@ -120,29 +86,14 @@ func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) 
 		}
 	}
 	for metricName, metricVal := range h.storage.CounterMetrics {
-		if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-			byteVal := []byte(fmt.Sprintf("%d", metricVal))
-			byteVal, err := Compress(byteVal)
-			rw.Header().Set("Content-Encoding", "gzip")
-			if err != nil {
-				log.Printf("compress error: %v", err)
-				return
-			}
-			_, err = rw.Write([]byte(fmt.Sprintf("%s: %s", metricName, string(byteVal))))
-			if err != nil {
-				log.Println(err)
-				return
-			}
-		} else {
-			_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
-			if err != nil {
-				log.Println(err)
-				return
-			}
+		_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
+		if err != nil {
+			log.Println(err)
+			return
 		}
 	}
 	rw.WriteHeader(http.StatusOK)
-	rw.Header().Add("Content-Type", "html/text")
+	rw.Header().Add("Content-Type", "text/plain")
 }
 
 func (h *Handler) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
@@ -175,14 +126,14 @@ func (h *Handler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	switch metricType {
 	case "gauge":
 		if metricVal, isIn := h.storage.GaugeMetrics[metricName]; isIn {
-			GetGaugeStatusOK(rw, r, metricVal)
+			GetGaugeStatusOK(rw, metricVal)
 		} else {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 		}
 
 	case "counter":
 		if metricVal, isIn := h.storage.CounterMetrics[metricName]; isIn {
-			GetCounterStatusOK(rw, r, metricVal)
+			GetCounterStatusOK(rw, metricVal)
 		} else {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 		}
@@ -281,14 +232,6 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 	if err != nil {
 		log.Printf("json Marshal error: %s", err)
 		return
-	}
-	if strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
-		jsonMetric, err = Compress(jsonMetric)
-		rw.Header().Set("Content-Encoding", "gzip")
-		if err != nil {
-			log.Printf("compress error: %v", err)
-			return
-		}
 	}
 	_, err = rw.Write(jsonMetric)
 	if err != nil {

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"io"
+	"net/http"
 	"time"
 )
 
@@ -14,6 +16,15 @@ type Metrics struct {
 type MemStorage struct {
 	CounterMetrics map[string]int64
 	GaugeMetrics   map[string]float64
+}
+
+type gzipWriter struct {
+	http.ResponseWriter
+	Writer io.Writer
+}
+
+func (w gzipWriter) Write(b []byte) (int, error) {
+	return w.Writer.Write(b)
 }
 
 type Handler struct {

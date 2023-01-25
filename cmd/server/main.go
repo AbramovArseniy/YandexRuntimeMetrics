@@ -23,6 +23,7 @@ const (
 func StartServer() {
 	s := server.NewServer()
 	handler := server.DecompressHandler(s.Router())
+	handler = server.CompressHandler(handler)
 	srv := &http.Server{
 		Handler: handler,
 	}

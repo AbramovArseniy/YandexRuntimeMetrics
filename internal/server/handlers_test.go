@@ -1,7 +1,6 @@
 package server
 
 import (
-	"compress/gzip"
 	"io"
 	"log"
 	"net/http"
@@ -12,28 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func Decompress(rw io.ReadCloser, r *http.Request) ([]byte, error) {
-	var reader io.Reader
-	if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
-		gz, err := gzip.NewReader(r.Body)
-		if err != nil {
-			log.Printf("gzip new reader error: %v", err)
-			return nil, err
-		}
-		reader = gz
-		defer gz.Close()
-	} else {
-		reader = r.Body
-	}
-
-	body, err := io.ReadAll(reader)
-	if err != nil {
-		log.Printf("error ReadAll: %v", err)
-		return nil, err
-	}
-	return body, nil
-}
 
 func TestGetMetricHandler(t *testing.T) {
 	type want struct {
@@ -115,7 +92,9 @@ func TestGetMetricHandler(t *testing.T) {
 		},
 	}
 	s := NewServer()
-	server := httptest.NewServer(DecompressHandler(s.Router()))
+	handler := DecompressHandler(s.Router())
+	handler = CompressHandler(handler)
+	server := httptest.NewServer(handler)
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -224,7 +203,9 @@ func TestJSONHandlers(t *testing.T) {
 		},
 	}
 	s := NewServer()
-	server := httptest.NewServer(s.Router())
+	handler := DecompressHandler(s.Router())
+	handler = CompressHandler(handler)
+	server := httptest.NewServer(handler)
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -249,7 +230,8 @@ func RunRequest(t *testing.T, ts *httptest.Server, method string, query string, 
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
-	RespBody, err := Decompress(resp.Body, req)
+
+	RespBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	return resp, string(RespBody)
 }
