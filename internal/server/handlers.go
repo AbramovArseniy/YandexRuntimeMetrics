@@ -77,6 +77,7 @@ func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 
 func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	log.Println("Get all request")
+	rw.Header().Set("Content-Type", "text/html")
 	for metricName, metricVal := range h.storage.GaugeMetrics {
 		strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
 		_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
@@ -93,7 +94,6 @@ func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) 
 		}
 	}
 	rw.WriteHeader(http.StatusOK)
-	rw.Header().Add("Content-Type", "text/html")
 }
 
 func (h *Handler) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
