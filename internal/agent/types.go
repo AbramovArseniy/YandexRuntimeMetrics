@@ -57,7 +57,7 @@ type Agent struct {
 func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration) *Agent {
 	return &Agent{
 		Address:        addr,
-		UpdateAddress:  fmt.Sprintf("http://%s/update", addr),
+		UpdateAddress:  fmt.Sprintf("http://%s/update/", addr),
 		sender:         NewSender(),
 		collector:      newCollector(),
 		PollInterval:   pollInterval,

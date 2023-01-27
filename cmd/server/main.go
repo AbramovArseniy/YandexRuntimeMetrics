@@ -68,6 +68,7 @@ func StartServer() {
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
 	srv := &http.Server{
+		Addr:    s.Addr,
 		Handler: handler,
 	}
 	if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
@@ -78,7 +79,7 @@ func StartServer() {
 	if s.FileHandler.Restore {
 		s.RestoreMetricsFromFile()
 	}
-	loggers.InfoLogger.Println("Server started")
+	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
 	go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	err := srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
