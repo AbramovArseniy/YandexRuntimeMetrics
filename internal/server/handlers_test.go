@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -91,7 +92,7 @@ func TestGetMetricHandler(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	s := NewServer()
+	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -202,14 +203,14 @@ func TestJSONHandlers(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	s := NewServer()
+	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log.Println(s.handler.storage)
+			log.Println(s.storage)
 			resp, body := RunRequest(t, server, tt.method, tt.URL, tt.body, "application/json")
 			defer resp.Body.Close()
 			assert.Equal(t, tt.want.code, resp.StatusCode)

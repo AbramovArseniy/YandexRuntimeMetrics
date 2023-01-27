@@ -18,8 +18,7 @@ const (
 	defaultAddress        = "localhost:8080"
 )
 
-func main() {
-	a := agent.NewAgent()
+func setAgentParams() (string, time.Duration, time.Duration) {
 	var (
 		flagPollInterval   time.Duration
 		flagReportInterval time.Duration
@@ -29,29 +28,34 @@ func main() {
 	flag.DurationVar(&flagReportInterval, "r", defaultReportInterval, "report_metrics_interval")
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
 	flag.Parse()
+	var pollInterval, reportInterval time.Duration
 	if strPollInterval, exists := os.LookupEnv("POLL_INTERVAL"); !exists {
-		a.PollInterval = flagPollInterval
+		pollInterval = flagPollInterval
 	} else {
 		var err error
-		if a.PollInterval, err = time.ParseDuration(strPollInterval); err != nil || a.PollInterval <= 0 {
+		if pollInterval, err = time.ParseDuration(strPollInterval); err != nil || pollInterval <= 0 {
 			log.Println("couldn't parse poll duration from environment")
-			a.PollInterval = flagPollInterval
+			pollInterval = flagPollInterval
 		}
 	}
 	if strReportInterval, exists := os.LookupEnv("REPORT_INTERVAL"); !exists {
-		a.ReportInterval = flagReportInterval
+		reportInterval = flagReportInterval
 	} else {
 		var err error
-		if a.ReportInterval, err = time.ParseDuration(strReportInterval); err != nil || a.ReportInterval <= 0 {
+		if reportInterval, err = time.ParseDuration(strReportInterval); err != nil || reportInterval <= 0 {
 			log.Println("couldn't parse report duration from")
-			a.ReportInterval = flagReportInterval
+			reportInterval = flagReportInterval
 		}
 	}
 	address, exists := os.LookupEnv("ADDRESS")
 	if !exists {
 		address = flagAddress
 	}
-	a.Address = address
+	return address, pollInterval, reportInterval
+}
+
+func main() {
+	a := agent.NewAgent(setAgentParams())
 	go repeating.Repeat(a.CollectRuntimeMetrics, a.PollInterval)
 	go repeating.Repeat(a.SendAllMetrics, a.ReportInterval)
 	log.Println("Agent started")

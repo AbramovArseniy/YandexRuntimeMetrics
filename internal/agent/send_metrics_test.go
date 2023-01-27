@@ -34,7 +34,7 @@ func TestSendCounter(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent()
+	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Counter{
@@ -91,7 +91,7 @@ func TestSendGauge(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent()
+	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Gauge{

@@ -6,15 +6,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
+
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/go-chi/chi/v5"
 )
 
 const contentTypeJSON = "application/json"
+
+var ErrTypeNotImplemented = errors.New("")
 
 func CompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -59,7 +62,7 @@ func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 	strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
 	_, err := rw.Write([]byte(strVal))
 	if err != nil {
-		log.Println(err)
+		loggers.ErrorLogger.Println("response writer error:", err)
 		return
 	}
 }
@@ -69,34 +72,34 @@ func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 	rw.Header().Add("Content-Type", "text/plain")
 	_, err := rw.Write([]byte(fmt.Sprintf("%d", metricVal)))
 	if err != nil {
-		log.Println(err)
+		loggers.ErrorLogger.Println("response writer error:", err)
 		return
 	}
 
 }
 
-func (h *Handler) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
-	log.Println("Get all request")
+func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+	loggers.InfoLogger.Println("Get all request")
 	rw.Header().Set("Content-Type", "text/html")
-	for metricName, metricVal := range h.storage.GaugeMetrics {
+	for metricName, metricVal := range s.storage.GaugeMetrics {
 		strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
 		_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
 		if err != nil {
-			log.Println(err)
+			loggers.ErrorLogger.Println("response writer error:", err)
 			return
 		}
 	}
-	for metricName, metricVal := range h.storage.CounterMetrics {
+	for metricName, metricVal := range s.storage.CounterMetrics {
 		_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
 		if err != nil {
-			log.Println(err)
+			loggers.ErrorLogger.Println("response writer error:", err)
 			return
 		}
 	}
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	metricType, metricName, metricValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
 	switch metricType {
 	case "gauge":
@@ -104,35 +107,39 @@ func (h *Handler) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			http.Error(rw, "Wrong Gauge Value", http.StatusBadRequest)
 		}
-		h.storage.GaugeMetrics[metricName] = newVal
+		s.storage.GaugeMetrics[metricName] = newVal
 	case "counter":
 		newVal, err := strconv.ParseInt(metricValue, 10, 64)
 		if err != nil {
 			http.Error(rw, "Wrong Counter Value", http.StatusBadRequest)
 		}
-		h.storage.CounterMetrics[metricName] += newVal
+		s.storage.CounterMetrics[metricName] += newVal
 	default:
-		log.Printf("wrong Metric Type: %s", metricType)
+		loggers.ErrorLogger.Printf("wrong Metric Type: %s", metricType)
 		http.Error(rw, "Wrong Metric Type", http.StatusNotImplemented)
 	}
-	log.Printf("POST %s %s", metricType, metricName)
+	if s.Debug {
+		loggers.DebugLogger.Printf("POST %s %s", metricType, metricName)
+	}
 	rw.Header().Add("Content-Type", "text/plain")
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	metricType, metricName := chi.URLParam(r, "type"), chi.URLParam(r, "name")
-	log.Printf("GET %s %s", metricType, metricName)
+	if s.Debug {
+		loggers.DebugLogger.Printf("GET %s %s", metricType, metricName)
+	}
 	switch metricType {
 	case "gauge":
-		if metricVal, isIn := h.storage.GaugeMetrics[metricName]; isIn {
+		if metricVal, isIn := s.storage.GaugeMetrics[metricName]; isIn {
 			GetGaugeStatusOK(rw, metricVal)
 		} else {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 		}
 
 	case "counter":
-		if metricVal, isIn := h.storage.CounterMetrics[metricName]; isIn {
+		if metricVal, isIn := s.storage.CounterMetrics[metricName]; isIn {
 			GetCounterStatusOK(rw, metricVal)
 		} else {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
@@ -142,56 +149,63 @@ func (h *Handler) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (h *Handler) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
 		if err != nil {
-			log.Println("Wrong content type")
+			loggers.ErrorLogger.Println("Wrong content type:", r.Header.Get("Content-Type"))
 			return
 		}
-		log.Println("Wrong content type")
+		loggers.ErrorLogger.Println("Wrong content type:", r.Header.Get("Content-Type"))
 		return
 	}
 	var m Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		rw.WriteHeader(http.StatusBadRequest)
-		log.Printf("Decode problem: %v", err)
+		loggers.ErrorLogger.Printf("Decode error: %v", err)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
 		if err != nil {
 			return
 		}
 		return
 	}
-	log.Println("POST JSON " + m.ID + " " + m.MType)
-	err := h.storeMetrics(m)
+	if s.Debug {
+		loggers.DebugLogger.Println("POST JSON " + m.ID + " " + m.MType)
+	}
+	err := s.storeMetrics(m)
 	if err != nil {
 		rw.Header().Set("Content-Type", contentTypeJSON)
-		log.Println(err)
-		http.Error(rw, err.Error(), http.StatusNotImplemented)
+		loggers.ErrorLogger.Println(err.Error())
+		if errors.Is(err, ErrTypeNotImplemented) {
+			http.Error(rw, err.Error(), http.StatusNotImplemented)
+		} else {
+			loggers.ErrorLogger.Println("Store Metrics error:", err.Error())
+		}
 		return
+
 	}
 	rw.Header().Add("Content-Type", contentTypeJSON)
 	jsonMetric, err := json.Marshal(m)
 	if err != nil {
-		log.Printf("json Marshal error: %s", err)
+		loggers.ErrorLogger.Printf("json Marshal error: %s", err)
 		return
 	}
 	_, err = rw.Write(jsonMetric)
 	if err != nil {
 		http.Error(rw, "can't write body", http.StatusInternalServerError)
-		log.Println(err)
+		loggers.ErrorLogger.Println(err)
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
 		if err != nil {
-			log.Println("Wrong content type")
+			loggers.ErrorLogger.Println("Wrong content type:", r.Header.Get("Content-Type"))
 			return
 		}
 		return
@@ -204,59 +218,68 @@ func (h *Handler) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reque
 		return
 	}
 	var m Metrics
-	json.Unmarshal(body, &m)
+	if err = json.Unmarshal(body, &m); err != nil {
+		http.Error(rw, "Could not unmarshal JSON:", http.StatusInternalServerError)
+		return
+	}
 
 	switch m.MType {
 	case "counter":
-		val, isIn := h.storage.CounterMetrics[m.ID]
+		val, isIn := s.storage.CounterMetrics[m.ID]
 		if !isIn {
-			log.Println("There is no metric you requested")
+			if s.Debug {
+				loggers.DebugLogger.Println("There is no metric you requested")
+			}
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			return
 		}
 		m.Delta = &val
 	case "gauge":
-		val, isIn := h.storage.GaugeMetrics[m.ID]
+		val, isIn := s.storage.GaugeMetrics[m.ID]
 		if !isIn {
-			log.Println("There is no metric you requested")
+			if s.Debug {
+				loggers.DebugLogger.Println("There is no metric you requested")
+			}
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			return
 		}
 		m.Value = &val
 	default:
-		log.Println("There is no metric you requested")
+		if s.Debug {
+			loggers.DebugLogger.Println("There is no metric you requested")
+		}
 		http.Error(rw, "There is no metric You requested", http.StatusNotFound)
 		return
 	}
 	jsonMetric, err := json.Marshal(m)
 	if err != nil {
-		log.Printf("json Marshal error: %s", err)
+		loggers.ErrorLogger.Printf("json Marshal error: %s", err)
 		return
 	}
 	_, err = rw.Write(jsonMetric)
 	if err != nil {
 		http.Error(rw, "can't write body", http.StatusInternalServerError)
-		log.Println(err)
+		loggers.ErrorLogger.Println(err)
 		return
 	}
 
 	rw.WriteHeader(http.StatusOK)
 }
 
-func (h *Handler) storeMetrics(m Metrics) error {
+func (s *Server) storeMetrics(m Metrics) error {
 	switch m.MType {
 	case "gauge":
 		if m.Value == nil {
-			return errors.New("no value in update request")
+			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		h.storage.GaugeMetrics[m.ID] = *m.Value
+		s.storage.GaugeMetrics[m.ID] = *m.Value
 	case "counter":
 		if m.Delta == nil {
-			return errors.New("no value in update request")
+			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		h.storage.CounterMetrics[m.ID] += *m.Delta
+		s.storage.CounterMetrics[m.ID] += *m.Delta
 	default:
-		return errors.New("no such type of metric")
+		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)
 	}
 	return nil
 }

@@ -1,10 +1,11 @@
 package agent
 
 import (
-	"log"
 	"math/rand"
 	"runtime"
 	"time"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
 func (a *Agent) CollectRuntimeMetrics() {
@@ -40,12 +41,12 @@ func (a *Agent) CollectRuntimeMetrics() {
 		{metricName: "Sys", metricValue: float64(stats.Sys)},
 		{metricName: "TotalAlloc", metricValue: float64(stats.TotalAlloc)},
 	}
-	log.Println("Collected GaugeMetrics")
+	loggers.InfoLogger.Println("Collected GaugeMetrics")
 }
 
 func (s *metricCollector) CollectRandomValueMetric() Gauge {
 	rand.Seed(time.Now().Unix())
 	randomValueMetric := Gauge{metricName: "RandomValue", metricValue: rand.Float64() * 1000}
-	log.Println("Collected RandomValueMectric")
+	loggers.InfoLogger.Println("Collected RandomValueMectric")
 	return randomValueMetric
 }

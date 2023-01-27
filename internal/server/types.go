@@ -27,10 +27,6 @@ func (w gzipWriter) Write(b []byte) (int, error) {
 	return w.Writer.Write(b)
 }
 
-type Handler struct {
-	storage MemStorage
-}
-
 type fileHandler struct {
 	StoreInterval time.Duration
 	StoreFile     string
@@ -39,23 +35,22 @@ type fileHandler struct {
 
 type Server struct {
 	Addr        string
-	handler     Handler
+	storage     MemStorage
 	FileHandler fileHandler
+	Debug       bool
 }
 
-func NewServer() *Server {
+func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool) *Server {
 	return &Server{
-		Addr: "localhost:8080",
-		handler: Handler{
-			storage: MemStorage{
-				CounterMetrics: make(map[string]int64),
-				GaugeMetrics:   make(map[string]float64),
-			},
+		Addr: address,
+		storage: MemStorage{
+			CounterMetrics: make(map[string]int64),
+			GaugeMetrics:   make(map[string]float64),
 		},
 		FileHandler: fileHandler{
-			StoreInterval: 300,
-			StoreFile:     "/tmp/devops-metrics-db.json",
-			Restore:       true,
+			StoreInterval: storeInterval,
+			StoreFile:     storeFile,
+			Restore:       restore,
 		},
 	}
 }

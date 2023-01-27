@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"fmt"
 	"net/http"
 	"time"
 )
@@ -48,16 +49,18 @@ type Agent struct {
 	sender         *metricSender
 	collector      *metricCollector
 	Address        string
+	UpdateAddress  string
 	PollInterval   time.Duration
 	ReportInterval time.Duration
 }
 
-func NewAgent() *Agent {
+func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration) *Agent {
 	return &Agent{
-		Address:        "localhost:8080",
+		Address:        addr,
+		UpdateAddress:  fmt.Sprintf("http://%s/update", addr),
 		sender:         NewSender(),
 		collector:      newCollector(),
-		PollInterval:   2 * time.Second,
-		ReportInterval: 10 * time.Second,
+		PollInterval:   pollInterval,
+		ReportInterval: reportInterval,
 	}
 }
