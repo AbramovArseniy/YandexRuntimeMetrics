@@ -17,7 +17,7 @@ import (
 
 const contentTypeJSON = "application/json"
 
-var ErrTypeNotImplemented = errors.New("")
+var ErrTypeNotImplemented = errors.New("not implemented: ")
 
 func CompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -175,13 +175,11 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 	err := s.storeMetrics(m)
 	if err != nil {
-		rw.Header().Set("Content-Type", contentTypeJSON)
 		loggers.ErrorLogger.Println(err.Error())
 		if errors.Is(err, ErrTypeNotImplemented) {
 			http.Error(rw, err.Error(), http.StatusNotImplemented)
-		} else {
-			loggers.ErrorLogger.Println("Store Metrics error:", err.Error())
 		}
+		loggers.ErrorLogger.Println("Store Metrics error:", err.Error())
 		return
 
 	}
