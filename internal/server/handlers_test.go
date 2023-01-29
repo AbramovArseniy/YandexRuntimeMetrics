@@ -92,7 +92,7 @@ func TestGetMetricHandler(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false)
+	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false, "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -220,7 +220,7 @@ func TestJSONHandlers(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false)
+	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false, "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)

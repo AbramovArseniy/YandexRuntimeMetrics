@@ -11,6 +11,7 @@ type Metrics struct {
 	MType string   `json:"type"`
 	Delta *int64   `json:"delta,omitempty"`
 	Value *float64 `json:"value,omitempty"`
+	Hash  string   `json:"hash,omitempty"`
 }
 
 type MemStorage struct {
@@ -38,9 +39,10 @@ type Server struct {
 	storage     MemStorage
 	FileHandler fileHandler
 	Debug       bool
+	Key         string
 }
 
-func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool) *Server {
+func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool, key string) *Server {
 	return &Server{
 		Addr: address,
 		storage: MemStorage{
@@ -52,5 +54,7 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 			StoreFile:     storeFile,
 			Restore:       restore,
 		},
+		Debug: debug,
+		Key:   key,
 	}
 }

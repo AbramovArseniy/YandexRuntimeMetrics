@@ -2,6 +2,8 @@ package server
 
 import (
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -18,6 +20,14 @@ import (
 const contentTypeJSON = "application/json"
 
 var ErrTypeNotImplemented = errors.New("not implemented: ")
+var ErrTypeBadRequest = errors.New("bad request: ")
+
+func hash(src, key string) []byte {
+	h := hmac.New(sha256.New, []byte(key))
+	h.Write([]byte(src))
+	dst := h.Sum(nil)
+	return dst
+}
 
 func CompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -105,13 +115,13 @@ func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	case "gauge":
 		newVal, err := strconv.ParseFloat(metricValue, 64)
 		if err != nil {
-			http.Error(rw, "Wrong Gauge Value", http.StatusBadRequest)
+			http.Error(rw, fmt.Sprintf("error parsing value %s as float", metricValue), http.StatusBadRequest)
 		}
 		s.storage.GaugeMetrics[metricName] = newVal
 	case "counter":
 		newVal, err := strconv.ParseInt(metricValue, 10, 64)
 		if err != nil {
-			http.Error(rw, "Wrong Counter Value", http.StatusBadRequest)
+			http.Error(rw, fmt.Sprintf("error parsing value %s as int", metricValue), http.StatusBadRequest)
 		}
 		s.storage.CounterMetrics[metricName] += newVal
 	default:
@@ -175,9 +185,11 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 	}
 	err := s.storeMetrics(m)
 	if err != nil {
-		loggers.ErrorLogger.Println(err.Error())
 		if errors.Is(err, ErrTypeNotImplemented) {
 			http.Error(rw, err.Error(), http.StatusNotImplemented)
+		}
+		if errors.Is(err, ErrTypeBadRequest) {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
 		}
 		loggers.ErrorLogger.Println("Store Metrics error:", err.Error())
 		return
@@ -210,7 +222,6 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 	}
 	body, err := io.ReadAll(r.Body)
 	rw.Header().Set("Content-Type", "application/json")
-
 	if err != nil {
 		http.Error(rw, "reading body error", http.StatusInternalServerError)
 		return
@@ -220,7 +231,9 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		http.Error(rw, "Could not unmarshal JSON:", http.StatusInternalServerError)
 		return
 	}
-
+	if s.Debug {
+		loggers.DebugLogger.Println("Get JSON:", m)
+	}
 	switch m.MType {
 	case "counter":
 		val, isIn := s.storage.CounterMetrics[m.ID]
@@ -232,6 +245,10 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 			return
 		}
 		m.Delta = &val
+		if s.Key != "" {
+			metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
+			m.Hash = string(metricHash)
+		}
 	case "gauge":
 		val, isIn := s.storage.GaugeMetrics[m.ID]
 		if !isIn {
@@ -242,6 +259,10 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 			return
 		}
 		m.Value = &val
+		if s.Key != "" {
+			metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
+			m.Hash = string(metricHash)
+		}
 	default:
 		if s.Debug {
 			loggers.DebugLogger.Println("There is no metric you requested")
@@ -270,10 +291,20 @@ func (s *Server) storeMetrics(m Metrics) error {
 		if m.Value == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
+		if s.Key != "" && m.Hash != "" {
+			if m.Hash != string(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)) {
+				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
+			}
+		}
 		s.storage.GaugeMetrics[m.ID] = *m.Value
 	case "counter":
 		if m.Delta == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
+		}
+		if s.Key != "" && m.Hash != "" {
+			if m.Hash != string(hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)) {
+				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
+			}
 		}
 		s.storage.CounterMetrics[m.ID] += *m.Delta
 	default:

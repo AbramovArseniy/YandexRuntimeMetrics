@@ -20,13 +20,14 @@ const (
 	defaultRestore       = true
 )
 
-func setServerParams() (string, time.Duration, string, bool, bool) {
+func setServerParams() (string, time.Duration, string, bool, bool, string) {
 	var (
 		flagRestore, restore             bool
 		flagStoreFile, storeFile         string
 		flagAddress                      string
 		flagStoreInterval, storeInterval time.Duration
 		flagDebug                        bool
+		flagKey                          string
 	)
 
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
@@ -34,6 +35,7 @@ func setServerParams() (string, time.Duration, string, bool, bool) {
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
 	flag.DurationVar(&flagStoreInterval, "i", defaultStoreInterval, "store_interval_in_seconds")
 	flag.BoolVar(&flagDebug, "d", false, "debug_true/false")
+	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.Parse()
 	address, exists := os.LookupEnv("ADDRESS")
 	if !exists {
@@ -60,7 +62,11 @@ func setServerParams() (string, time.Duration, string, bool, bool) {
 			restore = flagRestore
 		}
 	}
-	return address, storeInterval, storeFile, restore, flagDebug
+	key, exists := os.LookupEnv("KEY")
+	if !exists {
+		key = flagKey
+	}
+	return address, storeInterval, storeFile, restore, flagDebug, key
 }
 
 func StartServer() {

@@ -18,15 +18,17 @@ const (
 	defaultAddress        = "localhost:8080"
 )
 
-func setAgentParams() (string, time.Duration, time.Duration) {
+func setAgentParams() (string, time.Duration, time.Duration, string) {
 	var (
 		flagPollInterval   time.Duration
 		flagReportInterval time.Duration
 		flagAddress        string
+		flagKey            string
 	)
 	flag.DurationVar(&flagPollInterval, "p", defaultPollInterval, "poll_metrics_interval")
 	flag.DurationVar(&flagReportInterval, "r", defaultReportInterval, "report_metrics_interval")
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
+	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.Parse()
 	var pollInterval, reportInterval time.Duration
 	if strPollInterval, exists := os.LookupEnv("POLL_INTERVAL"); !exists {
@@ -51,7 +53,11 @@ func setAgentParams() (string, time.Duration, time.Duration) {
 	if !exists {
 		address = flagAddress
 	}
-	return address, pollInterval, reportInterval
+	key, exists := os.LookupEnv("KEY")
+	if !exists {
+		key = flagKey
+	}
+	return address, pollInterval, reportInterval, key
 }
 
 func main() {

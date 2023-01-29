@@ -3,6 +3,8 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -28,12 +30,23 @@ func Compress(data []byte) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
+func hash(src, key string) []byte {
+	h := hmac.New(sha256.New, []byte(key))
+	h.Write([]byte(src))
+	dst := h.Sum(nil)
+	return dst
+}
+
 func (a *Agent) SendGauge(metric Gauge) error {
 	url := a.UpdateAddress
 	m := Metrics{
 		ID:    metric.metricName,
 		MType: "gauge",
 		Value: &metric.metricValue,
+	}
+	if a.Key != "" {
+		metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), a.Key)
+		m.Hash = string(metricHash)
 	}
 	byteJSON, err := json.Marshal(m)
 	if err != nil {
@@ -67,6 +80,10 @@ func (a *Agent) SendCounter(metric Counter) error {
 		ID:    metric.metricName,
 		MType: "counter",
 		Delta: &metric.metricValue,
+	}
+	if a.Key != "" {
+		metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), a.Key)
+		m.Hash = string(metricHash)
 	}
 	byteJSON, err := json.Marshal(m)
 	if err != nil {
