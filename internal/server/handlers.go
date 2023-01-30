@@ -22,11 +22,11 @@ const contentTypeJSON = "application/json"
 var ErrTypeNotImplemented = errors.New("not implemented: ")
 var ErrTypeBadRequest = errors.New("bad request: ")
 
-func hash(src, key string) []byte {
+func hash(src, key string) string {
 	h := hmac.New(sha256.New, []byte(key))
 	h.Write([]byte(src))
 	dst := h.Sum(nil)
-	return dst
+	return fmt.Sprintf("%x", dst)
 }
 
 func CompressHandler(next http.Handler) http.Handler {
@@ -293,9 +293,9 @@ func (s *Server) storeMetrics(m Metrics) error {
 		}
 		if s.Key != "" && m.Hash != "" {
 			if s.Debug {
-				loggers.DebugLogger.Println(m.Hash, "     -     ", string(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)))
+				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))
 			}
-			if hmac.Equal([]byte(m.Hash), hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)) {
+			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))) {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}
@@ -305,7 +305,10 @@ func (s *Server) storeMetrics(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		if s.Key != "" && m.Hash != "" {
-			if m.Hash != string(hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)) {
+			if s.Debug {
+				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))
+			}
+			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))) {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}

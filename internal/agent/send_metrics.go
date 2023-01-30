@@ -30,11 +30,11 @@ func Compress(data []byte) ([]byte, error) {
 	return b.Bytes(), nil
 }
 
-func hash(src, key string) []byte {
+func hash(src, key string) string {
 	h := hmac.New(sha256.New, []byte(key))
 	h.Write([]byte(src))
 	dst := h.Sum(nil)
-	return dst
+	return fmt.Sprintf("%x", dst)
 }
 
 func (a *Agent) SendGauge(metric Gauge) error {
@@ -45,8 +45,7 @@ func (a *Agent) SendGauge(metric Gauge) error {
 		Value: &metric.metricValue,
 	}
 	if a.Key != "" {
-		metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), a.Key)
-		m.Hash = string(metricHash)
+		m.Hash = hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), a.Key)
 	}
 	byteJSON, err := json.Marshal(m)
 	if err != nil {
@@ -82,8 +81,7 @@ func (a *Agent) SendCounter(metric Counter) error {
 		Delta: &metric.metricValue,
 	}
 	if a.Key != "" {
-		metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), a.Key)
-		m.Hash = string(metricHash)
+		m.Hash = hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), a.Key)
 	}
 	byteJSON, err := json.Marshal(m)
 	if err != nil {
