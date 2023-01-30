@@ -292,7 +292,10 @@ func (s *Server) storeMetrics(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		if s.Key != "" && m.Hash != "" {
-			if m.Hash != string(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)) {
+			if s.Debug {
+				loggers.DebugLogger.Println(m.Hash, "     -     ", string(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)))
+			}
+			if hmac.Equal([]byte(m.Hash), hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)) {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}
