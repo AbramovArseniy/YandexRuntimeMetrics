@@ -36,7 +36,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	flag.StringVar(&flagStoreFile, "f", defaultStoreFile, "store_file")
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
 	flag.DurationVar(&flagStoreInterval, "i", defaultStoreInterval, "store_interval_in_seconds")
-	flag.BoolVar(&flagDebug, "d", false, "debug_true/false")
+	flag.BoolVar(&flagDebug, "debug", false, "debug_true/false")
 	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.StringVar(&flagDataBase, "d", "", "db_address")
 	flag.Parse()
