@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"flag"
 	"net/http"
 	"os"
@@ -20,7 +21,7 @@ const (
 	defaultRestore       = true
 )
 
-func setServerParams() (string, time.Duration, string, bool, bool, string) {
+func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
 	var (
 		flagRestore, restore             bool
 		flagStoreFile, storeFile         string
@@ -28,6 +29,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string) {
 		flagStoreInterval, storeInterval time.Duration
 		flagDebug                        bool
 		flagKey                          string
+		flagDataBase                     string
 	)
 
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
@@ -36,6 +38,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string) {
 	flag.DurationVar(&flagStoreInterval, "i", defaultStoreInterval, "store_interval_in_seconds")
 	flag.BoolVar(&flagDebug, "d", false, "debug_true/false")
 	flag.StringVar(&flagKey, "k", "", "hash_key")
+	flag.StringVar(&flagDataBase, "d", "", "db_address")
 	flag.Parse()
 	address, exists := os.LookupEnv("ADDRESS")
 	if !exists {
@@ -66,11 +69,21 @@ func setServerParams() (string, time.Duration, string, bool, bool, string) {
 	if !exists {
 		key = flagKey
 	}
-	return address, storeInterval, storeFile, restore, flagDebug, key
+	database, exists := os.LookupEnv("DATABASE_DSN")
+	if !exists {
+		database = flagDataBase
+	}
+	return address, storeInterval, storeFile, restore, flagDebug, key, database
 }
 
 func StartServer() {
-	s := server.NewServer(setServerParams())
+	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
+	db, err := sql.Open("postgresql", dbAddress)
+	if err != nil {
+		loggers.ErrorLogger.Println("opening DB error")
+	}
+	defer db.Close()
+	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
 	srv := &http.Server{
@@ -87,7 +100,7 @@ func StartServer() {
 	}
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
 	go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)
 	}

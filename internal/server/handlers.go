@@ -4,17 +4,19 @@ import (
 	"compress/gzip"
 	"crypto/hmac"
 	"crypto/sha256"
+
+	//"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/jackc/pgx"
 )
 
 const contentTypeJSON = "application/json"
@@ -282,6 +284,15 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
+	err := s.DataBase.Ping()
+	if err != nil {
+		http.Error(rw, "error occured while connecting to database", http.StatusInternalServerError)
+		return
+	}
 	rw.WriteHeader(http.StatusOK)
 }
 

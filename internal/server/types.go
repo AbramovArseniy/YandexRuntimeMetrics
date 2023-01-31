@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"io"
 	"net/http"
 	"time"
@@ -40,9 +41,10 @@ type Server struct {
 	FileHandler fileHandler
 	Debug       bool
 	Key         string
+	DataBase    *sql.DB
 }
 
-func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool, key string) *Server {
+func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool, key string, db *sql.DB) *Server {
 	return &Server{
 		Addr: address,
 		storage: MemStorage{
@@ -54,7 +56,8 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 			StoreFile:     storeFile,
 			Restore:       restore,
 		},
-		Debug: debug,
-		Key:   key,
+		Debug:    debug,
+		Key:      key,
+		DataBase: db,
 	}
 }
