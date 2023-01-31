@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
@@ -78,9 +80,9 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 
 func StartServer() {
 	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
-	db, err := sql.Open("postgresql", dbAddress)
+	db, err := sql.Open("pgx", dbAddress)
 	if err != nil {
-		loggers.ErrorLogger.Println("opening DB error")
+		loggers.ErrorLogger.Println("opening DB error:", err)
 	}
 	defer db.Close()
 	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
