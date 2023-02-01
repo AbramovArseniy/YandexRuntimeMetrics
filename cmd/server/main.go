@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -105,9 +104,7 @@ func StartServer() {
 			loggers.ErrorLogger.Println("opening DB error:", err)
 			db = nil
 		}
-		if db != nil {
-			defer db.Close()
-		}
+		defer db.Close()
 	} else {
 		db = nil
 	}
@@ -133,7 +130,6 @@ func StartServer() {
 		}
 		go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	}
-	go repeating.Repeat(func() { fmt.Println(db) }, 5*time.Second)
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
 	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {

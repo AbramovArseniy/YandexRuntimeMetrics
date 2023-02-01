@@ -248,11 +248,44 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		loggers.DebugLogger.Println("Get JSON:", m)
 	}
 	if s.DataBase != nil {
-		err = s.getMetricFromDatabase(&m, r)
-		loggers.ErrorLogger.Println("getMetricValue error:", err.Error())
-		if errors.Is(err, ErrTypeBadRequest) {
-			http.Error(rw, err.Error(), http.StatusNotFound)
-			return
+		switch m.MType {
+		case "gauge":
+			row, err := s.DataBase.QueryContext(r.Context(), "SELECT value from metrics WHERE id=$S", m.ID)
+			if err != nil {
+				loggers.ErrorLogger.Println("db query error:", err)
+				return
+			}
+			var value float64
+			err = row.Scan(&value)
+			if err != nil {
+				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+			}
+			m.Value = &value
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
+				m.Hash = string(metricHash)
+			}
+		case "counter":
+			row, err := s.DataBase.Query("SELECT delta from metrics WHERE id=$S", m.ID)
+			if err != nil {
+				loggers.ErrorLogger.Println("db query error:", err)
+				return
+			}
+			var delta int64
+			err = row.Scan(&delta)
+			if err != nil {
+				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+			}
+			m.Delta = &delta
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
+				m.Hash = string(metricHash)
+			}
+		default:
+			if s.Debug {
+				loggers.DebugLogger.Println("There is no metric you requested")
+			}
+			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 		}
 	} else {
 		switch m.MType {
@@ -382,39 +415,6 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		}
 	default:
 		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)
-	}
-	return nil
-}
-
-func (s *Server) getMetricFromDatabase(m *Metrics, r *http.Request) error {
-	switch m.MType {
-	case "gauge":
-		row, err := s.DataBase.QueryContext(r.Context(), "SELECT value from metrics WHERE id=$S", m.ID)
-		if err != nil {
-			return err
-		}
-		var value float64
-		err = row.Scan(&value)
-		if err != nil {
-			return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
-		}
-		m.Value = &value
-	case "counter":
-		row, err := s.DataBase.Query("SELECT delta from metrics WHERE id=$S", m.ID)
-		if err != nil {
-			return err
-		}
-		var delta int64
-		err = row.Scan(&delta)
-		if err != nil {
-			return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
-		}
-		m.Delta = &delta
-	default:
-		if s.Debug {
-			loggers.DebugLogger.Println("There is no metric you requested")
-		}
-		return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
 	}
 	return nil
 }
