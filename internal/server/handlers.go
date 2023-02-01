@@ -197,6 +197,17 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 		return
 
 	}
+	if s.DataBase != nil {
+		err = s.storeMetricsToDatabase(m)
+		if err != nil {
+			if errors.Is(err, ErrTypeNotImplemented) {
+				http.Error(rw, err.Error(), http.StatusNotImplemented)
+			}
+			loggers.ErrorLogger.Println("store metrics to db error:", err.Error())
+			return
+
+		}
+	}
 	rw.Header().Add("Content-Type", contentTypeJSON)
 	jsonMetric, err := json.Marshal(m)
 	if err != nil {
@@ -328,6 +339,32 @@ func (s *Server) storeMetrics(m Metrics) error {
 			}
 		}
 		s.storage.CounterMetrics[m.ID] += *m.Delta
+	default:
+		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)
+	}
+	return nil
+}
+
+func (s *Server) storeMetricsToDatabase(m Metrics) error {
+	switch m.MType {
+	case "gauge":
+		_, err := s.DataBase.Query(`
+		INSERT INTO metrics 
+			(id, type, value)
+		VALUES
+			($T, $T, $N)`, m.ID, m.MType, *m.Value)
+		if err != nil {
+			return err
+		}
+	case "counter":
+		_, err := s.DataBase.Query(`
+		INSERT INTO metrics 
+			(id, type, value)
+		VALUES
+			($T, $T, $N)`, m.ID, m.MType, *m.Delta)
+		if err != nil {
+			return err
+		}
 	default:
 		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)
 	}

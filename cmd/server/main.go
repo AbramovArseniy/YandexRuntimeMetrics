@@ -78,16 +78,35 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	return address, storeInterval, storeFile, restore, flagDebug, key, database
 }
 
+func setDatabase(db *sql.DB) error {
+	_, err := db.Query(`CREATE TABLE IF NOT EXISTS metrics(
+		id		TEXT NOT NULL, 
+		type	TEXT NOT NULL, 
+		delta	INT, 
+		value	DOUBLE PRECISION,
+		PRIMARY KEY ("id"))`)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func StartServer() {
 	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
 	db, err := sql.Open("pgx", dbAddress)
 	if err != nil {
 		loggers.ErrorLogger.Println("opening DB error:", err)
+		db = nil
 	}
-	defer db.Close()
+	if db != nil {
+		defer db.Close()
+	}
 	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
+	if db != nil {
+		setDatabase(s.DataBase)
+	}
 	srv := &http.Server{
 		Addr:    s.Addr,
 		Handler: handler,
@@ -97,11 +116,13 @@ func StartServer() {
 			loggers.ErrorLogger.Println("failed to create directory:", err)
 		}
 	}
-	if s.FileHandler.Restore {
-		s.RestoreMetricsFromFile()
+	if db == nil {
+		if s.FileHandler.Restore {
+			s.RestoreMetricsFromFile()
+		}
+		loggers.InfoLogger.Printf("Server started at %s", s.Addr)
+		go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	}
-	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
-	go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)
