@@ -194,7 +194,6 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 			}
 			loggers.ErrorLogger.Println("store metrics to db error:", err.Error())
 			return
-
 		}
 	} else {
 		err := s.storeMetrics(m)
@@ -256,10 +255,40 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 			return
 		}
 	} else {
-		err = s.getMetricValue(&m)
-		loggers.ErrorLogger.Println("getMetricValue error:", err.Error())
-		if errors.Is(err, ErrTypeBadRequest) {
-			http.Error(rw, err.Error(), http.StatusNotFound)
+		switch m.MType {
+		case "counter":
+			val, isIn := s.storage.CounterMetrics[m.ID]
+			if !isIn {
+				if s.Debug {
+					loggers.DebugLogger.Println("There is no metric you requested")
+				}
+				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+				return
+			}
+			m.Delta = &val
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
+				m.Hash = string(metricHash)
+			}
+		case "gauge":
+			val, isIn := s.storage.GaugeMetrics[m.ID]
+			if !isIn {
+				if s.Debug {
+					loggers.DebugLogger.Println("There is no metric you requested")
+				}
+				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+				return
+			}
+			m.Value = &val
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
+				m.Hash = string(metricHash)
+			}
+		default:
+			if s.Debug {
+				loggers.DebugLogger.Println("There is no metric you requested")
+			}
+			http.Error(rw, "There is no metric You requested", http.StatusNotFound)
 			return
 		}
 	}
@@ -325,43 +354,6 @@ func (s *Server) storeMetrics(m Metrics) error {
 	return nil
 }
 
-func (s *Server) getMetricValue(m *Metrics) error {
-	switch m.MType {
-	case "counter":
-		val, isIn := s.storage.CounterMetrics[m.ID]
-		if !isIn {
-			if s.Debug {
-				loggers.DebugLogger.Println("There is no metric you requested")
-			}
-			return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
-		}
-		m.Delta = &val
-		if s.Key != "" {
-			metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
-			m.Hash = string(metricHash)
-		}
-	case "gauge":
-		val, isIn := s.storage.GaugeMetrics[m.ID]
-		if !isIn {
-			if s.Debug {
-				loggers.DebugLogger.Println("There is no metric you requested")
-			}
-			return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
-		}
-		m.Value = &val
-		if s.Key != "" {
-			metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
-			m.Hash = string(metricHash)
-		}
-	default:
-		if s.Debug {
-			loggers.DebugLogger.Println("There is no metric you requested")
-		}
-		return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
-	}
-	return nil
-}
-
 func (s *Server) storeMetricsToDatabase(m Metrics) error {
 	switch m.MType {
 	case "gauge":
@@ -401,19 +393,23 @@ func (s *Server) getMetricFromDatabase(m *Metrics, r *http.Request) error {
 		if err != nil {
 			return err
 		}
-		err = row.Scan(m.Value)
+		var value float64
+		err = row.Scan(&value)
 		if err != nil {
-			return err
+			return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
 		}
+		m.Value = &value
 	case "counter":
 		row, err := s.DataBase.Query("SELECT delta from metrics WHERE id=$S", m.ID)
 		if err != nil {
 			return err
 		}
-		err = row.Scan(m.Delta)
+		var delta int64
+		err = row.Scan(&delta)
 		if err != nil {
-			return err
+			return fmt.Errorf("%wthere is no metric you requested", ErrTypeNotFound)
 		}
+		m.Delta = &delta
 	default:
 		if s.Debug {
 			loggers.DebugLogger.Println("There is no metric you requested")

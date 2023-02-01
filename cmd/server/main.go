@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -96,14 +97,21 @@ func setDatabase(db *sql.DB) error {
 
 func StartServer() {
 	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
-	db, err := sql.Open("pgx", dbAddress)
-	if err != nil {
-		loggers.ErrorLogger.Println("opening DB error:", err)
+	var db *sql.DB
+	var err error
+	if dbAddress != "" {
+		db, err = sql.Open("pgx", dbAddress)
+		if err != nil {
+			loggers.ErrorLogger.Println("opening DB error:", err)
+			db = nil
+		}
+		if db != nil {
+			defer db.Close()
+		}
+	} else {
 		db = nil
 	}
-	if db != nil {
-		defer db.Close()
-	}
+	loggers.ErrorLogger.Println(dbAddress)
 	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
@@ -125,6 +133,7 @@ func StartServer() {
 		}
 		go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	}
+	go repeating.Repeat(func() { fmt.Println(db) }, 5*time.Second)
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
 	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
