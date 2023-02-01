@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"flag"
 	"net/http"
@@ -79,7 +80,9 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 }
 
 func setDatabase(db *sql.DB) error {
-	_, err := db.Query(`CREATE TABLE IF NOT EXISTS metrics(
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_, err := db.QueryContext(ctx, `CREATE TABLE IF NOT EXISTS metrics(
 		id		TEXT NOT NULL, 
 		type	TEXT NOT NULL, 
 		delta	INT, 
@@ -111,18 +114,18 @@ func StartServer() {
 		Addr:    s.Addr,
 		Handler: handler,
 	}
-	if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
-		if err := os.MkdirAll(s.FileHandler.StoreFile[:strings.LastIndex(s.FileHandler.StoreFile, "/")], 0777); err != nil {
-			loggers.ErrorLogger.Println("failed to create directory:", err)
-		}
-	}
 	if db == nil {
+		if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
+			if err := os.MkdirAll(s.FileHandler.StoreFile[:strings.LastIndex(s.FileHandler.StoreFile, "/")], 0777); err != nil {
+				loggers.ErrorLogger.Println("failed to create directory:", err)
+			}
+		}
 		if s.FileHandler.Restore {
 			s.RestoreMetricsFromFile()
 		}
-		loggers.InfoLogger.Printf("Server started at %s", s.Addr)
 		go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	}
+	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
 	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)
