@@ -250,7 +250,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 	if s.DataBase != nil {
 		switch m.MType {
 		case "gauge":
-			row, err := s.DataBase.QueryContext(r.Context(), "SELECT value from metrics WHERE id=$S", m.ID)
+			row, err := s.DataBase.QueryContext(r.Context(), "SELECT value from metrics WHERE id=?", m.ID)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return
@@ -266,7 +266,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 				m.Hash = string(metricHash)
 			}
 		case "counter":
-			row, err := s.DataBase.Query("SELECT delta from metrics WHERE id=$S", m.ID)
+			row, err := s.DataBase.Query("SELECT delta from metrics WHERE id=?", m.ID)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return
@@ -397,7 +397,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		INSERT INTO metrics 
 			(id, type, value)
 		VALUES
-			($S, $S, $N)`, m.ID, m.MType, *m.Value)
+			(?, ?, $1)`, m.ID, m.MType, *m.Value)
 		if err != nil {
 			return err
 		}
@@ -409,7 +409,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		INSERT INTO metrics 
 			(id, type, delta)
 		VALUES
-			($S, $S, $N)`, m.ID, m.MType, *m.Delta)
+			(?, ?, $1)`, m.ID, m.MType, *m.Delta)
 		if err != nil {
 			return err
 		}
