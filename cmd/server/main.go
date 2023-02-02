@@ -86,7 +86,8 @@ func setDatabase(db *sql.DB) error {
 		id VARCHAR(128) PRIMARY KEY,
 		type VARCHAR(32) NOT NULL,
 		value DOUBLE PRECISION,
-		delta BIGINT)`)
+		delta BIGINT);
+		CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_id_mtype ON metrics (id, mtype);`)
 
 	if err != nil {
 		loggers.ErrorLogger.Println("error while creating table:", err)
