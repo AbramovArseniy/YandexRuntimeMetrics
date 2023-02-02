@@ -4,6 +4,7 @@ import (
 	"compress/gzip"
 	"crypto/hmac"
 	"crypto/sha256"
+	"database/sql"
 
 	//"database/sql"
 	"encoding/json"
@@ -94,19 +95,53 @@ func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	loggers.InfoLogger.Println("Get all request")
 	rw.Header().Set("Content-Type", "text/html")
-	for metricName, metricVal := range s.storage.GaugeMetrics {
-		strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
-		_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
+	if s.DataBase == nil {
+		for metricName, metricVal := range s.storage.GaugeMetrics {
+			strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
+			_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
+			if err != nil {
+				loggers.ErrorLogger.Println("response writer error:", err)
+				return
+			}
+		}
+		for metricName, metricVal := range s.storage.CounterMetrics {
+			_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
+			if err != nil {
+				loggers.ErrorLogger.Println("response writer error:", err)
+				return
+			}
+		}
+	} else {
+		rows, err := s.DataBase.QueryContext(r.Context(), "SELECT id, type, value, delta FROM metrics")
 		if err != nil {
-			loggers.ErrorLogger.Println("response writer error:", err)
+			http.Error(rw, fmt.Sprintf("database error: %v", err), http.StatusInternalServerError)
 			return
 		}
-	}
-	for metricName, metricVal := range s.storage.CounterMetrics {
-		_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
-		if err != nil {
-			loggers.ErrorLogger.Println("response writer error:", err)
-			return
+		for rows.Next() {
+			var (
+				id, mType string
+				delta     sql.NullInt64
+				value     sql.NullFloat64
+			)
+			rows.Scan(&id, &mType, &delta, &value)
+			switch mType {
+			case "counter":
+				_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", id, delta.Int64)))
+				if err != nil {
+					loggers.ErrorLogger.Println("response writer error:", err)
+					return
+				}
+			case "gauge":
+				_, err := rw.Write([]byte(fmt.Sprintf("%s: %f", id, value.Float64)))
+				if err != nil {
+					loggers.ErrorLogger.Println("response writer error:", err)
+					return
+				}
+			}
+			if rows.Err() != nil {
+				http.Error(rw, fmt.Sprintf("database error: %v", rows.Err()), http.StatusInternalServerError)
+				return
+			}
 		}
 	}
 	rw.WriteHeader(http.StatusOK)
@@ -265,10 +300,6 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 			var delta int64
 			err := s.DataBase.QueryRowContext(r.Context(), "SELECT delta::int8 from metrics WHERE id=$1::text", m.ID).Scan(&delta)
 			if err != nil {
-				loggers.ErrorLogger.Println("db query error:", err)
-				return
-			}
-			if err != nil {
 				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			}
 			m.Delta = &delta
@@ -388,25 +419,35 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		if m.Value == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		row := s.DataBase.QueryRow(`
-		INSERT INTO metrics 
-			(id, type, value)
-		VALUES
-			($1::text, $2::text, $3::float8)`, m.ID, m.MType, *m.Value)
-		if row.Err() != nil {
-			return row.Err()
+		res, err := s.DataBase.Exec(`
+		IF EXISTS (SELECT * FROM invoices WHERE id=$1)
+		UPDATE metrics SET value=$2::float8 WHERE id=$3::text
+		ELSE
+		INSERT INTO metrics (id, type, delta)
+		VALUES ($4::text, $5::text, $6::float8)`, m.ID, *m.Value, m.ID, m.ID, m.MType, *m.Value)
+		if err != nil {
+			return err
+		}
+		_, err = res.RowsAffected()
+		if err != nil {
+			return err
 		}
 	case "counter":
 		if m.Delta == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		row := s.DataBase.QueryRow(`
-		INSERT INTO metrics 
-			(id, type, delta)
-		VALUES
-			($1::text, $2::text, $3::int8)`, m.ID, m.MType, *m.Delta)
-		if row.Err() != nil {
-			return row.Err()
+		res, err := s.DataBase.Exec(`
+		IF EXISTS (SELECT * FROM invoices WHERE id=$1)
+		UPDATE metrics SET delta=$2::int8 WHERE id=$3::text
+		ELSE
+		INSERT INTO metrics (id, type, delta)
+		VALUES ($4::text, $5::text, $6::int8)`, m.ID, *m.Delta, m.ID, m.ID, m.MType, *m.Delta)
+		if err != nil {
+			return err
+		}
+		_, err = res.RowsAffected()
+		if err != nil {
+			return err
 		}
 	default:
 		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)

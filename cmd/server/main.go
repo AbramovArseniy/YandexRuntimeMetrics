@@ -82,13 +82,19 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 func setDatabase(db *sql.DB) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_, err := db.QueryContext(ctx, `CREATE TABLE IF NOT EXISTS metrics(
+	res, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS metrics(
 		id		TEXT NOT NULL, 
 		type	TEXT NOT NULL, 
 		delta	INT, 
 		value	DOUBLE PRECISION,
 		PRIMARY KEY ("id"))`)
 	if err != nil {
+		loggers.ErrorLogger.Println("error while creating table:", err)
+		return err
+	}
+	_, err = res.RowsAffected()
+	if err != nil {
+		loggers.ErrorLogger.Println("error when getting rows affected:", err)
 		return err
 	}
 	return nil
