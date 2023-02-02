@@ -437,10 +437,9 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		res, err := s.DataBase.Exec(`
-		INSERT INTO metrics (id, type, delta)
-		VALUES ($1::text, $2::text, $3::int8)
+		INSERT INTO metrics (id, type, delta) VALUES ($1::text, $2::text, $3::int8)
 		ON COLFLICT (id) DO
-		UPDATE metrics SET delta=$4::int8 WHERE id=$5::text
+		UPDATE SET delta=$4::int8 WHERE id=$5::text
 		`, m.ID, m.MType, *m.Delta, *m.Delta, m.ID)
 		if err != nil {
 			return err

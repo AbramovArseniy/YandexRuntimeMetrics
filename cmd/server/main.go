@@ -87,7 +87,7 @@ func setDatabase(db *sql.DB) error {
 		type	TEXT NOT NULL, 
 		delta	INT, 
 		value	DOUBLE PRECISION,
-		PRIMARY KEY ("id"))`)
+		UNIQUE (id))`)
 	if err != nil {
 		loggers.ErrorLogger.Println("error while creating table:", err)
 		return err
