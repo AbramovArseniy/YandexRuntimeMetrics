@@ -250,15 +250,11 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 	if s.DataBase != nil {
 		switch m.MType {
 		case "gauge":
-			row, err := s.DataBase.QueryContext(r.Context(), "SELECT value from metrics WHERE id=$1::text", m.ID)
+			var value float64
+			err := s.DataBase.QueryRowContext(r.Context(), "SELECT value from metrics WHERE id=$1::text", m.ID).Scan(&value)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return
-			}
-			var value float64
-			err = row.Scan(&value)
-			if err != nil {
-				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			}
 			m.Value = &value
 			if s.Key != "" {
@@ -266,13 +262,12 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 				m.Hash = string(metricHash)
 			}
 		case "counter":
-			row, err := s.DataBase.Query("SELECT delta from metrics WHERE id=$1::text", m.ID)
+			var delta int64
+			err := s.DataBase.QueryRowContext(r.Context(), "SELECT delta from metrics WHERE id=$1::text", m.ID).Scan(&delta)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return
 			}
-			var delta int64
-			err = row.Scan(&delta)
 			if err != nil {
 				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			}
@@ -397,7 +392,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		INSERT INTO metrics 
 			(id, type, value)
 		VALUES
-			($1::text, $1::text, $1::float8)`, m.ID, m.MType, *m.Value)
+			($1::text, $2::text, $3::float8)`, m.ID, m.MType, *m.Value)
 		if err != nil {
 			return err
 		}
@@ -409,7 +404,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		INSERT INTO metrics 
 			(id, type, delta)
 		VALUES
-			($1::text, $1::text, $1)`, m.ID, m.MType, *m.Delta)
+			($1::text, $2::text, $3)`, m.ID, m.MType, *m.Delta)
 		if err != nil {
 			return err
 		}
