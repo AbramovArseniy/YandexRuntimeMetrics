@@ -251,7 +251,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		switch m.MType {
 		case "gauge":
 			var value float64
-			err := s.DataBase.QueryRowContext(r.Context(), "SELECT value from metrics WHERE id=$1::text", m.ID).Scan(&value)
+			err := s.DataBase.QueryRowContext(r.Context(), "SELECT value::float8 from metrics WHERE id=$1::text", m.ID).Scan(&value)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return
@@ -263,7 +263,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 			}
 		case "counter":
 			var delta int64
-			err := s.DataBase.QueryRowContext(r.Context(), "SELECT delta from metrics WHERE id=$1::text", m.ID).Scan(&delta)
+			err := s.DataBase.QueryRowContext(r.Context(), "SELECT delta::int8 from metrics WHERE id=$1::text", m.ID).Scan(&delta)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return
@@ -388,25 +388,25 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		if m.Value == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		_, err := s.DataBase.Query(`
+		row := s.DataBase.QueryRow(`
 		INSERT INTO metrics 
 			(id, type, value)
 		VALUES
 			($1::text, $2::text, $3::float8)`, m.ID, m.MType, *m.Value)
-		if err != nil {
-			return err
+		if row.Err() != nil {
+			return row.Err()
 		}
 	case "counter":
 		if m.Delta == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		_, err := s.DataBase.Query(`
+		row := s.DataBase.QueryRow(`
 		INSERT INTO metrics 
 			(id, type, delta)
 		VALUES
-			($1::text, $2::text, $3)`, m.ID, m.MType, *m.Delta)
-		if err != nil {
-			return err
+			($1::text, $2::text, $3::int8)`, m.ID, m.MType, *m.Delta)
+		if row.Err() != nil {
+			return row.Err()
 		}
 	default:
 		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)

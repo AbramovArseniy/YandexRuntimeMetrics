@@ -108,7 +108,6 @@ func StartServer() {
 	} else {
 		db = nil
 	}
-	loggers.ErrorLogger.Println(dbAddress)
 	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
