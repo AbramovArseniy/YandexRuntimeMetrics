@@ -420,8 +420,8 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		query, err := s.DataBase.Prepare(`
-		INSERT INTO metrics (metrics.id, type, value, delta) VALUES ($1::text, $2::text, $3::float8, NULL) 
-		ON CONFLICT (metrics.id) DO UPDATE SET value=$3::float8 WHERE metrics.id=$1::text
+		INSERT INTO metrics (metrics.id, type, value, delta) VALUES ($1, $2, $3, NULL) 
+		ON CONFLICT (metrics.id) DO UPDATE SET value=$3 WHERE metrics.id=$1
 		`)
 		if err != nil {
 			return err
@@ -439,8 +439,8 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		query, err := s.DataBase.Prepare(`
-		INSERT INTO metrics (metrics.id, type, delta, value) VALUES ($1::text, $2::text, $3::int8, NULL)
-		ON CONFLICT (metrics.id) DO UPDATE SET delta = $3::int8 WHERE metrics.id = $1::text
+		INSERT INTO metrics (metrics.id, type, delta, value) VALUES ($1, $2, $3, NULL)
+		ON CONFLICT (metrics.id) DO UPDATE SET delta = $3 WHERE metrics.id = $1
 		`)
 		if err != nil {
 			return err
