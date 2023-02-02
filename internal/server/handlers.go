@@ -112,7 +112,7 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		rows, err := s.DataBase.QueryContext(r.Context(), "SELECT id, type, value, delta FROM metrics")
+		rows, err := s.DataBase.QueryContext(r.Context(), "SELECT metrics.id, type, value, delta FROM metrics")
 		if err != nil {
 			http.Error(rw, fmt.Sprintf("database error: %v", err), http.StatusInternalServerError)
 			return
@@ -286,7 +286,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		switch m.MType {
 		case "gauge":
 			var value float64
-			err := s.DataBase.QueryRowContext(r.Context(), "SELECT value::float8 from metrics WHERE id=$1::text", m.ID).Scan(&value)
+			err := s.DataBase.QueryRowContext(r.Context(), "SELECT value::float8 from metrics WHERE metrics.id=$1::text", m.ID).Scan(&value)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return
@@ -298,7 +298,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 			}
 		case "counter":
 			var delta int64
-			err := s.DataBase.QueryRowContext(r.Context(), "SELECT delta::int8 from metrics WHERE id=$1::text", m.ID).Scan(&delta)
+			err := s.DataBase.QueryRowContext(r.Context(), "SELECT delta::int8 from metrics WHERE metrics.id=$1::text", m.ID).Scan(&delta)
 			if err != nil {
 				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 			}
@@ -420,10 +420,10 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		res, err := s.DataBase.Exec(`
-		INSERT INTO metrics (id, type, delta)
+		INSERT INTO metrics (metrics.id, type, delta)
 		VALUES ($1::text, $2::text, $3::float8)
-		ON CONFLICT (id) DO
-		UPDATE SET value=$4::float8 WHERE id=$5::text
+		ON CONFLICT (metrics.id) DO
+		UPDATE SET value=$4::float8 WHERE metrics.id=$5::text
 		`, m.ID, m.MType, *m.Value, *m.Value, m.ID)
 		if err != nil {
 			return err
@@ -437,9 +437,9 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		res, err := s.DataBase.Exec(`
-		INSERT INTO metrics (id, type, delta) VALUES ($1::text, $2::text, $3::int8)
-		ON CONFLICT (id) DO
-		UPDATE SET delta=$4::int8 WHERE id=$5::text
+		INSERT INTO metrics (metrics.id, type, delta) VALUES ($1::text, $2::text, $3::int8)
+		ON CONFLICT (metrics.id) DO
+		UPDATE SET delta=$4::int8 WHERE metrics.id=$5::text
 		`, m.ID, m.MType, *m.Delta, *m.Delta, m.ID)
 		if err != nil {
 			return err
