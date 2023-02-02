@@ -28,11 +28,11 @@ const (
 			BEGIN
 				CREATE TABLE IF NOT EXISTS metrics (
 					id VARCHAR(128) PRIMARY KEY,
-					mtype VARCHAR(32) NOT NULL,
+					type VARCHAR(32) NOT NULL,
 					value DOUBLE PRECISION,
 					delta BIGINT
 				);
-				CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_id_mtype ON metrics (id, mtype);
+				CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_id_mtype ON metrics (id, type);
 			END
 			$code$
 		`
