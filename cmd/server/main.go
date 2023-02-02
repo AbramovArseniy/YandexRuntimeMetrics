@@ -85,7 +85,7 @@ func setDatabase(db *sql.DB) error {
 	res, err := db.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS metrics(
 		id		TEXT NOT NULL, 
 		type	TEXT NOT NULL, 
-		delta	INT, 
+		delta	BIGINT, 
 		value	DOUBLE PRECISION,
 		UNIQUE (id))`)
 	if err != nil {
