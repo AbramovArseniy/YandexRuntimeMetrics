@@ -420,11 +420,11 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		res, err := s.DataBase.Exec(`
-		IF EXISTS (SELECT * FROM invoices WHERE id=$1)
-		UPDATE metrics SET value=$2::float8 WHERE id=$3::text
-		ELSE
 		INSERT INTO metrics (id, type, delta)
-		VALUES ($4::text, $5::text, $6::float8)`, m.ID, *m.Value, m.ID, m.ID, m.MType, *m.Value)
+		VALUES ($1::text, $2::text, $3::float8)
+		ON COLFLICT
+		UPDATE metrics SET value=$4::float8 WHERE id=$5::text
+		`, m.ID, m.MType, *m.Value, *m.Value, m.ID)
 		if err != nil {
 			return err
 		}
@@ -437,11 +437,11 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
 		res, err := s.DataBase.Exec(`
-		IF EXISTS (SELECT * FROM invoices WHERE id=$1)
-		UPDATE metrics SET delta=$2::int8 WHERE id=$3::text
-		ELSE
 		INSERT INTO metrics (id, type, delta)
-		VALUES ($4::text, $5::text, $6::int8)`, m.ID, *m.Delta, m.ID, m.ID, m.MType, *m.Delta)
+		VALUES ($1::text, $2::text, $3::int8)
+		ON COLFLICT
+		UPDATE metrics SET delta=$4::int8 WHERE id=$5::text
+		`, m.ID, m.MType, *m.Delta, *m.Delta, m.ID)
 		if err != nil {
 			return err
 		}
