@@ -421,7 +421,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		}
 		query, err := s.DataBase.Prepare(`
 		INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'gauge', $2, NULL)
-    	ON CONFLICT (id, type) DO UPDATE SET
+    	ON CONFLICT (id) DO UPDATE SET
             value=EXCLUDED.value,
             delta=EXCLUDED.delta;
 		`)
@@ -442,7 +442,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		}
 		query, err := s.DataBase.Prepare(`
 		INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'counter', NULL, $2)
-    	ON CONFLICT (id, type) DO UPDATE SET
+    	ON CONFLICT (id) DO UPDATE SET
             value=EXCLUDED.value,
             delta=EXCLUDED.delta;
 		`)
