@@ -79,11 +79,11 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 		}
 		selectOneGaugeStmt, err = db.Prepare(`SELECT value FROM metrics WHERE id=$1;`)
 		if err != nil {
-			loggers.ErrorLogger.Println("select one statement prepare error:", err)
+			loggers.ErrorLogger.Println("select one gauge statement prepare error:", err)
 		}
-		selectOneCounterStmt, err = db.Prepare(`SELECT value FROM metrics WHERE id=$1;`)
+		selectOneCounterStmt, err = db.Prepare(`SELECT delta FROM metrics WHERE id=$1;`)
 		if err != nil {
-			loggers.ErrorLogger.Println("select one statement prepare error:", err)
+			loggers.ErrorLogger.Println("select one counter statement prepare error:", err)
 		}
 	}
 	return &Server{
