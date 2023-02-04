@@ -5,6 +5,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
 type Metrics struct {
@@ -36,15 +38,39 @@ type fileHandler struct {
 }
 
 type Server struct {
-	Addr        string
-	storage     MemStorage
-	FileHandler fileHandler
-	Debug       bool
-	Key         string
-	DataBase    *sql.DB
+	Addr                       string
+	storage                    MemStorage
+	FileHandler                fileHandler
+	Debug                      bool
+	Key                        string
+	DataBase                   *sql.DB
+	InsertUpdateToDatabaseStmt *sql.Stmt
+	SelectAllFromDatabaseStmt  *sql.Stmt
+	SelectOneFromDatabaseStmt  *sql.Stmt
 }
 
 func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool, key string, db *sql.DB) *Server {
+	var insertStmt, selectAllStmt, selectOneStmt *sql.Stmt = nil, nil, nil
+	if db != nil {
+		var err error
+		insertStmt, err = db.Prepare(`
+			INSERT INTO metrics (id, type, value, delta) VALUES ($1, $2, $3, NULL)
+			ON CONFLICT (id, type) DO UPDATE SET
+				value=EXCLUDED.value,
+				delta=EXCLUDED.delta;
+		`)
+		if err != nil {
+			loggers.ErrorLogger.Println("insert statement prepare error:", err)
+		}
+		selectAllStmt, err = db.Prepare(`SELECT id, mtype, value, delta FROM metrics;`)
+		if err != nil {
+			loggers.ErrorLogger.Println("select all statement prepare error:", err)
+		}
+		selectOneStmt, err = db.Prepare(`SELECT id, mtype, value, delta FROM metrics WHERE id=$1;`)
+		if err != nil {
+			loggers.ErrorLogger.Println("select one statement prepare error:", err)
+		}
+	}
 	return &Server{
 		Addr: address,
 		storage: MemStorage{
@@ -56,8 +82,11 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 			StoreFile:     storeFile,
 			Restore:       restore,
 		},
-		Debug:    debug,
-		Key:      key,
-		DataBase: db,
+		Debug:                      debug,
+		Key:                        key,
+		DataBase:                   db,
+		InsertUpdateToDatabaseStmt: insertStmt,
+		SelectAllFromDatabaseStmt:  selectAllStmt,
+		SelectOneFromDatabaseStmt:  selectOneStmt,
 	}
 }

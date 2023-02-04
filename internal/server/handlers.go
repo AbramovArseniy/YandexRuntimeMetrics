@@ -174,26 +174,34 @@ func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
-	metricType, metricName := chi.URLParam(r, "type"), chi.URLParam(r, "name")
-	if s.Debug {
-		loggers.DebugLogger.Printf("GET %s %s", metricType, metricName)
+	var m = Metrics{
+		ID:    chi.URLParam(r, "name"),
+		MType: chi.URLParam(r, "type"),
 	}
-	switch metricType {
-	case "gauge":
-		if metricVal, isIn := s.storage.GaugeMetrics[metricName]; isIn {
-			GetGaugeStatusOK(rw, metricVal)
-		} else {
-			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+	if s.Debug {
+		loggers.DebugLogger.Printf("GET %s %s", m.MType, m.ID)
+	}
+	if m, err := s.GetMetricValue(rw, r, m); err == nil {
+		if s.Debug {
+			loggers.DebugLogger.Println(m.ID, *m.Delta)
 		}
+		switch m.MType {
+		case "counter":
+			if s.Debug {
+				loggers.DebugLogger.Println(m.ID, *m.Delta)
+			}
+			GetCounterStatusOK(rw, *m.Delta)
+		case "gauge":
 
-	case "counter":
-		if metricVal, isIn := s.storage.CounterMetrics[metricName]; isIn {
-			GetCounterStatusOK(rw, metricVal)
-		} else {
+			GetGaugeStatusOK(rw, *m.Value)
+		}
+	} else {
+		if s.Debug {
+			loggers.DebugLogger.Println("metric not found")
+		}
+		if errors.Is(err, ErrTypeNotFound) {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 		}
-	default:
-		http.Error(rw, "There is no metric you requested", http.StatusNotFound)
 	}
 }
 
@@ -282,74 +290,17 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 	if s.Debug {
 		loggers.DebugLogger.Println("Get JSON:", m)
 	}
-	if s.DataBase != nil {
-		switch m.MType {
-		case "gauge":
-			var value float64
-			err := s.DataBase.QueryRowContext(r.Context(), "SELECT value::float8 from metrics WHERE metrics.id=$1::text", m.ID).Scan(&value)
-			if err != nil {
-				loggers.ErrorLogger.Println("db query error:", err)
-				return
-			}
-			m.Value = &value
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
-				m.Hash = string(metricHash)
-			}
-		case "counter":
-			var delta int64
-			err := s.DataBase.QueryRowContext(r.Context(), "SELECT delta::int8 from metrics WHERE metrics.id=$1::text", m.ID).Scan(&delta)
-			if err != nil {
-				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
-			}
-			m.Delta = &delta
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
-				m.Hash = string(metricHash)
-			}
-		default:
-			if s.Debug {
-				loggers.DebugLogger.Println("There is no metric you requested")
-			}
+	m, err = s.GetMetricValue(rw, r, m)
+	if s.Debug {
+		loggers.DebugLogger.Println(m)
+	}
+	if err != nil {
+		if errors.Is(err, ErrTypeNotFound) {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+		} else {
+			http.Error(rw, fmt.Sprintf("Err while getting value: %v", err), http.StatusInternalServerError)
 		}
-	} else {
-		switch m.MType {
-		case "counter":
-			val, isIn := s.storage.CounterMetrics[m.ID]
-			if !isIn {
-				if s.Debug {
-					loggers.DebugLogger.Println("There is no metric you requested")
-				}
-				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
-				return
-			}
-			m.Delta = &val
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
-				m.Hash = string(metricHash)
-			}
-		case "gauge":
-			val, isIn := s.storage.GaugeMetrics[m.ID]
-			if !isIn {
-				if s.Debug {
-					loggers.DebugLogger.Println("There is no metric you requested")
-				}
-				http.Error(rw, "There is no metric you requested", http.StatusNotFound)
-				return
-			}
-			m.Value = &val
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
-				m.Hash = string(metricHash)
-			}
-		default:
-			if s.Debug {
-				loggers.DebugLogger.Println("There is no metric you requested")
-			}
-			http.Error(rw, "There is no metric You requested", http.StatusNotFound)
-			return
-		}
+		return
 	}
 	jsonMetric, err := json.Marshal(m)
 	if err != nil {
@@ -377,6 +328,76 @@ func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) GetMetricValue(rw http.ResponseWriter, r *http.Request, m Metrics) (Metrics, error) {
+	if s.DataBase != nil {
+		switch m.MType {
+		case "gauge":
+			var value float64
+			err := s.SelectOneFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&value)
+			if err != nil {
+				loggers.ErrorLogger.Println("db query error:", err)
+				return m, err
+			}
+			m.Value = &value
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
+				m.Hash = string(metricHash)
+			}
+		case "counter":
+			var delta int64
+			err := s.SelectOneFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&delta)
+			if err != nil {
+				return m, ErrTypeNotFound
+			}
+			m.Delta = &delta
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
+				m.Hash = string(metricHash)
+			}
+		default:
+			if s.Debug {
+				loggers.DebugLogger.Println("There is no metric you requested")
+			}
+			return m, ErrTypeNotFound
+		}
+	} else {
+		switch m.MType {
+		case "counter":
+			val, isIn := s.storage.CounterMetrics[m.ID]
+			if !isIn {
+				if s.Debug {
+					loggers.DebugLogger.Println("There is no metric you requested")
+				}
+				return m, ErrTypeNotFound
+			}
+			m.Delta = &val
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
+				m.Hash = string(metricHash)
+			}
+		case "gauge":
+			val, isIn := s.storage.GaugeMetrics[m.ID]
+			if !isIn {
+				if s.Debug {
+					loggers.DebugLogger.Println("There is no metric you requested")
+				}
+				return m, ErrTypeNotFound
+			}
+			m.Value = &val
+			if s.Key != "" {
+				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
+				m.Hash = string(metricHash)
+			}
+		default:
+			if s.Debug {
+				loggers.DebugLogger.Println("There is no metric you requested")
+			}
+			return m, ErrTypeNotFound
+		}
+	}
+	return m, nil
 }
 
 func (s *Server) storeMetrics(m Metrics) error {
@@ -419,20 +440,15 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		if m.Value == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		query, err := s.DataBase.Prepare(`
-		INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'gauge', $2, NULL)
-    	ON CONFLICT (id, type) DO UPDATE SET
-            value=EXCLUDED.value,
-            delta=EXCLUDED.delta;
-		`)
-		if err != nil {
-			return err
+		if s.Key != "" && m.Hash != "" {
+			if s.Debug {
+				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))
+			}
+			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))) {
+				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
+			}
 		}
-		res, err := query.Exec(m.ID, *m.Value)
-		if err != nil {
-			return err
-		}
-		_, err = res.RowsAffected()
+		_, err := s.InsertUpdateToDatabaseStmt.Exec(m.ID, m.MType, *m.Value)
 		if err != nil {
 			return err
 		}
@@ -440,16 +456,15 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		if m.Delta == nil {
 			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
 		}
-		query, err := s.DataBase.Prepare(`
-		INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'counter', NULL, $2)
-    	ON CONFLICT (id, type) DO UPDATE SET
-            value=EXCLUDED.value,
-            delta=EXCLUDED.delta;
-		`)
-		if err != nil {
-			return err
+		if s.Key != "" && m.Hash != "" {
+			if s.Debug {
+				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))
+			}
+			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))) {
+				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
+			}
 		}
-		res, err := query.Exec(m.ID, *m.Delta)
+		res, err := s.InsertUpdateToDatabaseStmt.Exec(m.ID, m.MType, *m.Delta)
 		if err != nil {
 			return err
 		}

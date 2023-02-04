@@ -22,19 +22,14 @@ const (
 	defaultStoreInterval = 300 * time.Second
 	defaultStoreFile     = "/tmp/devops-metrics-db.json"
 	defaultRestore       = true
-	ddlSQL               = `
-			DO
-			$code$
-			BEGIN
+	createTableQuerySQL  = `
 				CREATE TABLE IF NOT EXISTS metrics (
 					id VARCHAR(128) PRIMARY KEY,
 					type VARCHAR(32) NOT NULL,
 					value DOUBLE PRECISION,
 					delta BIGINT
 				);
-				CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_id_mtype ON metrics (id, type);
-			END
-			$code$
+				CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_id_type ON metrics (id, type);
 		`
 )
 
@@ -94,9 +89,8 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 }
 
 func setDatabase(db *sql.DB) error {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	res, err := db.ExecContext(ctx, ddlSQL)
+	ctx := context.Background()
+	res, err := db.ExecContext(ctx, createTableQuerySQL)
 
 	if err != nil {
 		loggers.ErrorLogger.Println("error while creating table:", err)
