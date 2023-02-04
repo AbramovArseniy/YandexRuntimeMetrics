@@ -55,7 +55,7 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 	if db != nil {
 		var err error
 		insertCounterStmt, err = db.Prepare(`
-			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'counter', NULL, $3)
+			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'counter', NULL, $2)
 			ON CONFLICT (id, type) DO UPDATE SET
 				value=EXCLUDED.value,
 				delta=EXCLUDED.delta;
@@ -64,7 +64,7 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 			loggers.ErrorLogger.Println("insert counter statement prepare error:", err)
 		}
 		insertGaugeStmt, err = db.Prepare(`
-			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'gauge', $3, NULL)
+			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'gauge', $2, NULL)
 			ON CONFLICT (id, type) DO UPDATE SET
 				value=EXCLUDED.value,
 				delta=EXCLUDED.delta;
