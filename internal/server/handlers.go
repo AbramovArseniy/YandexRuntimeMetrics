@@ -335,7 +335,7 @@ func (s *Server) GetMetricValue(rw http.ResponseWriter, r *http.Request, m Metri
 		switch m.MType {
 		case "gauge":
 			var value float64
-			err := s.SelectOneFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&value)
+			err := s.SelectOneGaugeFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&value)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return m, err
@@ -347,7 +347,7 @@ func (s *Server) GetMetricValue(rw http.ResponseWriter, r *http.Request, m Metri
 			}
 		case "counter":
 			var delta int64
-			err := s.SelectOneFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&delta)
+			err := s.SelectOneCounterFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&delta)
 			if err != nil {
 				return m, ErrTypeNotFound
 			}

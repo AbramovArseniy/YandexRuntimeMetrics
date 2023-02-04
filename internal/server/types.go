@@ -47,11 +47,12 @@ type Server struct {
 	InsertUpdateCounterToDatabaseStmt *sql.Stmt
 	InsertUpdateGaugeToDatabaseStmt   *sql.Stmt
 	SelectAllFromDatabaseStmt         *sql.Stmt
-	SelectOneFromDatabaseStmt         *sql.Stmt
+	SelectOneGaugeFromDatabaseStmt    *sql.Stmt
+	SelectOneCounterFromDatabaseStmt  *sql.Stmt
 }
 
 func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool, key string, db *sql.DB) *Server {
-	var insertCounterStmt, insertGaugeStmt, selectAllStmt, selectOneStmt *sql.Stmt = nil, nil, nil, nil
+	var insertCounterStmt, insertGaugeStmt, selectAllStmt, selectOneGaugeStmt, selectOneCounterStmt *sql.Stmt = nil, nil, nil, nil, nil
 	if db != nil {
 		var err error
 		insertCounterStmt, err = db.Prepare(`
@@ -76,7 +77,11 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 		if err != nil {
 			loggers.ErrorLogger.Println("select all statement prepare error:", err)
 		}
-		selectOneStmt, err = db.Prepare(`SELECT id, type, value, delta FROM metrics WHERE id=$1;`)
+		selectOneGaugeStmt, err = db.Prepare(`SELECT value FROM metrics WHERE id=$1;`)
+		if err != nil {
+			loggers.ErrorLogger.Println("select one statement prepare error:", err)
+		}
+		selectOneCounterStmt, err = db.Prepare(`SELECT value FROM metrics WHERE id=$1;`)
 		if err != nil {
 			loggers.ErrorLogger.Println("select one statement prepare error:", err)
 		}
@@ -98,6 +103,7 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 		InsertUpdateCounterToDatabaseStmt: insertCounterStmt,
 		InsertUpdateGaugeToDatabaseStmt:   insertGaugeStmt,
 		SelectAllFromDatabaseStmt:         selectAllStmt,
-		SelectOneFromDatabaseStmt:         selectOneStmt,
+		SelectOneGaugeFromDatabaseStmt:    selectOneGaugeStmt,
+		SelectOneCounterFromDatabaseStmt:  selectOneCounterStmt,
 	}
 }
