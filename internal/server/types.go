@@ -62,11 +62,11 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 		if err != nil {
 			loggers.ErrorLogger.Println("insert statement prepare error:", err)
 		}
-		selectAllStmt, err = db.Prepare(`SELECT id, mtype, value, delta FROM metrics;`)
+		selectAllStmt, err = db.Prepare(`SELECT id, type, value, delta FROM metrics;`)
 		if err != nil {
 			loggers.ErrorLogger.Println("select all statement prepare error:", err)
 		}
-		selectOneStmt, err = db.Prepare(`SELECT id, mtype, value, delta FROM metrics WHERE id=$1;`)
+		selectOneStmt, err = db.Prepare(`SELECT id, type, value, delta FROM metrics WHERE id=$1;`)
 		if err != nil {
 			loggers.ErrorLogger.Println("select one statement prepare error:", err)
 		}
