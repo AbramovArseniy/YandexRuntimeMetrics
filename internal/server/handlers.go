@@ -166,9 +166,9 @@ func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 		loggers.ErrorLogger.Printf("wrong Metric Type: %s", metricType)
 		http.Error(rw, "Wrong Metric Type", http.StatusNotImplemented)
 	}
-	if s.Debug {
-		loggers.DebugLogger.Printf("POST %s %s", metricType, metricName)
-	}
+	//if s.Debug {
+	loggers.DebugLogger.Printf("POST %s %s", metricType, metricName)
+	//}
 	rw.Header().Add("Content-Type", "text/plain")
 	rw.WriteHeader(http.StatusOK)
 }
@@ -226,9 +226,9 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 		}
 		return
 	}
-	if s.Debug {
-		loggers.DebugLogger.Println("POST JSON " + m.ID + " " + m.MType)
-	}
+	//if s.Debug {
+	loggers.DebugLogger.Println("POST JSON " + m.ID + " " + m.MType)
+	//}
 	if s.DataBase != nil {
 		err := s.storeMetricsToDatabase(m)
 		if err != nil {
@@ -464,11 +464,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}
-		res, err := s.InsertUpdateCounterToDatabaseStmt.Exec(m.ID, *m.Delta)
-		if err != nil {
-			return err
-		}
-		_, err = res.RowsAffected()
+		_, err := s.InsertUpdateCounterToDatabaseStmt.Exec(m.ID, *m.Delta)
 		if err != nil {
 			return err
 		}
