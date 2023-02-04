@@ -464,9 +464,26 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}
-		_, err := s.InsertUpdateCounterToDatabaseStmt.Exec(m.ID, *m.Delta)
+		var numberOfMetrics int
+		err := s.CountIDsInDatabaseStmt.QueryRow(m.ID).Scan(&numberOfMetrics)
 		if err != nil {
 			return err
+		}
+		if numberOfMetrics != 0 {
+			var delta int64
+			err = s.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
+			if err != nil {
+				return err
+			}
+			_, err = s.UpdateCounterToDatabaseStmt.Exec(m.ID, delta+*m.Delta)
+			if err != nil {
+				return err
+			}
+		} else {
+			_, err = s.InsertCounterToDatabaseStmt.Exec(m.ID, *m.Delta)
+			if err != nil {
+				return err
+			}
 		}
 	default:
 		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)

@@ -38,31 +38,40 @@ type fileHandler struct {
 }
 
 type Server struct {
-	Addr                              string
-	storage                           MemStorage
-	FileHandler                       fileHandler
-	Debug                             bool
-	Key                               string
-	DataBase                          *sql.DB
-	InsertUpdateCounterToDatabaseStmt *sql.Stmt
-	InsertUpdateGaugeToDatabaseStmt   *sql.Stmt
-	SelectAllFromDatabaseStmt         *sql.Stmt
-	SelectOneGaugeFromDatabaseStmt    *sql.Stmt
-	SelectOneCounterFromDatabaseStmt  *sql.Stmt
+	Addr                             string
+	storage                          MemStorage
+	FileHandler                      fileHandler
+	Debug                            bool
+	Key                              string
+	DataBase                         *sql.DB
+	InsertCounterToDatabaseStmt      *sql.Stmt
+	UpdateCounterToDatabaseStmt      *sql.Stmt
+	InsertUpdateGaugeToDatabaseStmt  *sql.Stmt
+	SelectAllFromDatabaseStmt        *sql.Stmt
+	SelectOneGaugeFromDatabaseStmt   *sql.Stmt
+	SelectOneCounterFromDatabaseStmt *sql.Stmt
+	CountIDsInDatabaseStmt           *sql.Stmt
 }
 
 func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool, key string, db *sql.DB) *Server {
-	var insertCounterStmt, insertGaugeStmt, selectAllStmt, selectOneGaugeStmt, selectOneCounterStmt *sql.Stmt = nil, nil, nil, nil, nil
+	var insertCounterStmt, updateCounterStmt, countIDsStmt, insertGaugeStmt, selectAllStmt, selectOneGaugeStmt, selectOneCounterStmt *sql.Stmt = nil, nil, nil, nil, nil, nil, nil
 	if db != nil {
 		var err error
+		countIDsStmt, err = db.Prepare("SELECT COUNT(*) FROM metrics WHERE id=$1;")
+		if err != nil {
+			loggers.ErrorLogger.Println("count metrics with id statement prepare error:", err)
+		}
 		insertCounterStmt, err = db.Prepare(`
 			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'counter', NULL, $2)
-			ON CONFLICT (id, type) DO UPDATE SET
-				value=NULL,
-				delta=$2;
 		`)
 		if err != nil {
 			loggers.ErrorLogger.Println("insert counter statement prepare error:", err)
+		}
+		updateCounterStmt, err = db.Prepare(`
+			UPDATE metrics SET delta=$2 WHERE id=$1;
+		`)
+		if err != nil {
+			loggers.ErrorLogger.Println("update counter statement prepare error:", err)
 		}
 		insertGaugeStmt, err = db.Prepare(`
 			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'gauge', $2, NULL)
@@ -97,13 +106,15 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 			StoreFile:     storeFile,
 			Restore:       restore,
 		},
-		Debug:                             debug,
-		Key:                               key,
-		DataBase:                          db,
-		InsertUpdateCounterToDatabaseStmt: insertCounterStmt,
-		InsertUpdateGaugeToDatabaseStmt:   insertGaugeStmt,
-		SelectAllFromDatabaseStmt:         selectAllStmt,
-		SelectOneGaugeFromDatabaseStmt:    selectOneGaugeStmt,
-		SelectOneCounterFromDatabaseStmt:  selectOneCounterStmt,
+		Debug:                            debug,
+		Key:                              key,
+		DataBase:                         db,
+		InsertCounterToDatabaseStmt:      insertCounterStmt,
+		UpdateCounterToDatabaseStmt:      updateCounterStmt,
+		InsertUpdateGaugeToDatabaseStmt:  insertGaugeStmt,
+		SelectAllFromDatabaseStmt:        selectAllStmt,
+		SelectOneGaugeFromDatabaseStmt:   selectOneGaugeStmt,
+		SelectOneCounterFromDatabaseStmt: selectOneCounterStmt,
+		CountIDsInDatabaseStmt:           countIDsStmt,
 	}
 }
