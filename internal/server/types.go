@@ -58,8 +58,8 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 		insertCounterStmt, err = db.Prepare(`
 			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'counter', NULL, $2)
 			ON CONFLICT (id, type) DO UPDATE SET
-				value=$2,
-				delta=NULL;
+				value=NULL,
+				delta=$2;
 		`)
 		if err != nil {
 			loggers.ErrorLogger.Println("insert counter statement prepare error:", err)
@@ -67,8 +67,8 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 		insertGaugeStmt, err = db.Prepare(`
 			INSERT INTO metrics (id, type, value, delta) VALUES ($1, 'gauge', $2, NULL)
 			ON CONFLICT (id, type) DO UPDATE SET
-				value=NULL,
-				delta=$2;
+				value=$2,
+				delta=NULL;
 		`)
 		if err != nil {
 			loggers.ErrorLogger.Println("insert statement prepare error:", err)
