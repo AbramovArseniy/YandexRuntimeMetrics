@@ -448,7 +448,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}
-		_, err := s.InsertUpdateToDatabaseStmt.Exec(m.ID, m.MType, *m.Value)
+		_, err := s.InsertUpdateToDatabaseStmt.Exec(m.ID, m.MType, *m.Value, "NULL")
 		if err != nil {
 			return err
 		}
@@ -464,7 +464,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}
-		res, err := s.InsertUpdateToDatabaseStmt.Exec(m.ID, m.MType, *m.Delta)
+		res, err := s.InsertUpdateToDatabaseStmt.Exec(m.ID, m.MType, "NULL", *m.Delta)
 		if err != nil {
 			return err
 		}

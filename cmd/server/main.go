@@ -90,15 +90,10 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 
 func setDatabase(db *sql.DB) error {
 	ctx := context.Background()
-	res, err := db.ExecContext(ctx, createTableQuerySQL)
+	_, err := db.ExecContext(ctx, createTableQuerySQL)
 
 	if err != nil {
 		loggers.ErrorLogger.Println("error while creating table:", err)
-		return err
-	}
-	_, err = res.RowsAffected()
-	if err != nil {
-		loggers.ErrorLogger.Println("error when getting rows affected:", err)
 		return err
 	}
 	return nil
@@ -113,6 +108,8 @@ func StartServer() {
 		if err != nil {
 			loggers.ErrorLogger.Println("opening DB error:", err)
 			db = nil
+		} else {
+			setDatabase(db)
 		}
 		defer db.Close()
 	} else {
@@ -121,9 +118,6 @@ func StartServer() {
 	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
-	if db != nil {
-		setDatabase(s.DataBase)
-	}
 	srv := &http.Server{
 		Addr:    s.Addr,
 		Handler: handler,

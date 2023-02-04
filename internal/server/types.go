@@ -54,7 +54,7 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 	if db != nil {
 		var err error
 		insertStmt, err = db.Prepare(`
-			INSERT INTO metrics (id, type, value, delta) VALUES ($1, $2, $3, NULL)
+			INSERT INTO metrics (id, type, value, delta) VALUES ($1, $2, $3, $4)
 			ON CONFLICT (id, type) DO UPDATE SET
 				value=EXCLUDED.value,
 				delta=EXCLUDED.delta;
