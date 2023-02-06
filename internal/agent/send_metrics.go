@@ -181,10 +181,14 @@ func (a *Agent) SendAllMetricsAsButch() {
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
-	_, err = a.sender.client.Do(req)
+	resp, err := a.sender.client.Do(req)
 	if err != nil {
 		loggers.ErrorLogger.Println("Client.Do() error:", err)
 		return
 	}
 	loggers.InfoLogger.Println("Sent Counter")
+	err = resp.Body.Close()
+	if err != nil {
+		loggers.ErrorLogger.Println("response body close error:", err)
+	}
 }
