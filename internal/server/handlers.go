@@ -147,6 +147,21 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+	var metrics []Metrics
+	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
+		loggers.ErrorLogger.Println("update many decode error:", err)
+	}
+	if s.Debug {
+		loggers.DebugLogger.Println("POST many metrics request")
+	}
+	err := s.StoreManyMetrics(metrics)
+	if err != nil {
+		loggers.ErrorLogger.Println("store many metrics error:", err)
+		return
+	}
+}
+
 func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	metricType, metricName, metricValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
 	switch metricType {
@@ -487,6 +502,21 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 		}
 	default:
 		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)
+	}
+	return nil
+}
+
+func (s *Server) StoreManyMetrics(metrics []Metrics) error {
+	var err error
+	for _, m := range metrics {
+		if s.DataBase != nil {
+			err = s.storeMetricsToDatabase(m)
+		} else {
+			err = s.storeMetrics(m)
+		}
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }

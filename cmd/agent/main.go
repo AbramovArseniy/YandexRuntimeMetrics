@@ -63,7 +63,7 @@ func setAgentParams() (string, time.Duration, time.Duration, string) {
 func main() {
 	a := agent.NewAgent(setAgentParams())
 	go repeating.Repeat(a.CollectRuntimeMetrics, a.PollInterval)
-	go repeating.Repeat(a.SendAllMetrics, a.ReportInterval)
+	go repeating.Repeat(a.SendAllMetricsAsButch, a.ReportInterval)
 	log.Println("Agent started")
 	cancelSignal := make(chan os.Signal, 1)
 	signal.Notify(cancelSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

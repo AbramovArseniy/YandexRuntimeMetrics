@@ -129,3 +129,62 @@ func (a *Agent) SendAllMetrics() {
 	}
 	loggers.InfoLogger.Println("Sent Counter")
 }
+
+func (a *Agent) SendAllMetricsAsButch() {
+	url := a.UpdateAllAddress
+	newMetrics := a.collector.CollectRandomValueMetric()
+	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
+	var metrics []Metrics
+	for _, metric := range a.collector.GaugeMetrics {
+		var metricHash string
+		if a.Key != "" {
+			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.metricName, metric.metricValue), a.Key)
+		}
+		var value = metric.metricValue
+		metrics = append(metrics, Metrics{
+			ID:    metric.metricName,
+			MType: "gauge",
+			Value: &value,
+			Hash:  metricHash,
+		})
+		loggers.DebugLogger.Println(metrics, metric.metricName, metric.metricValue)
+	}
+	loggers.InfoLogger.Println("Sent Gauge")
+	var metricHash string
+	if a.Key != "" {
+		metricHash = hash(fmt.Sprintf("%s:counter:%d", "PollCount", a.collector.PollCount), a.Key)
+	}
+	var delta = a.collector.PollCount
+	metrics = append(metrics, Metrics{
+		ID:    "PollCount",
+		MType: "counter",
+		Delta: &delta,
+		Hash:  metricHash,
+	})
+	a.collector.PollCount = 0
+	jsonMetrics, err := json.Marshal(metrics)
+	loggers.DebugLogger.Println(string(jsonMetrics))
+	if err != nil {
+		loggers.ErrorLogger.Println("can't send Counter " + err.Error())
+		return
+	}
+	compressedJSON, err := Compress(jsonMetrics)
+	if err != nil {
+		loggers.ErrorLogger.Printf("Compress error: %v", err)
+	}
+	body := strings.NewReader(string(compressedJSON))
+	req, err := http.NewRequest("POST", url, body)
+	if err != nil {
+		loggers.ErrorLogger.Println("Request Creation error")
+		return
+	}
+	req.Close = true
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Content-Encoding", "gzip")
+	_, err = a.sender.client.Do(req)
+	if err != nil {
+		loggers.ErrorLogger.Println("Client.Do() error:", err)
+		return
+	}
+	loggers.InfoLogger.Println("Sent Counter")
+}
