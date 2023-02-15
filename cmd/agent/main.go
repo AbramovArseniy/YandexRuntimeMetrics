@@ -12,12 +12,6 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 )
 
-const (
-	defaultPollInterval   = 2 * time.Second
-	defaultReportInterval = 10 * time.Second
-	defaultAddress        = "localhost:8080"
-)
-
 func setAgentParams() (string, time.Duration, time.Duration, string) {
 	var (
 		flagPollInterval   time.Duration

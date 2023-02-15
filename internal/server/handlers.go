@@ -95,7 +95,7 @@ func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	loggers.InfoLogger.Println("Get all request")
 	rw.Header().Set("Content-Type", "text/html")
-	if s.DataBase == nil {
+	if s.Database.DB == nil {
 		for metricName, metricVal := range s.storage.GaugeMetrics {
 			strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
 			_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
@@ -112,7 +112,7 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		rows, err := s.DataBase.QueryContext(r.Context(), "SELECT metrics.id, type, value, delta FROM metrics")
+		rows, err := s.Database.DB.QueryContext(r.Context(), "SELECT metrics.id, type, value, delta FROM metrics")
 		if err != nil {
 			http.Error(rw, fmt.Sprintf("database error: %v", err), http.StatusInternalServerError)
 			return
@@ -244,7 +244,7 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 	//if s.Debug {
 	loggers.DebugLogger.Println("POST JSON " + m.ID + " " + m.MType)
 	//}
-	if s.DataBase != nil {
+	if s.Database.DB != nil {
 		err := s.storeMetricsToDatabase(m)
 		if err != nil {
 			if errors.Is(err, ErrTypeNotImplemented) {
@@ -333,11 +333,11 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 }
 
 func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
-	if s.DataBase == nil {
+	if s.Database.DB == nil {
 		http.Error(rw, "nil database pointer", http.StatusInternalServerError)
 		return
 	}
-	if err := s.DataBase.Ping(); err != nil {
+	if err := s.Database.DB.Ping(); err != nil {
 		http.Error(rw, "error occured while connecting to database", http.StatusInternalServerError)
 		loggers.ErrorLogger.Println("db.Ping error:", err)
 		return
@@ -346,11 +346,11 @@ func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) GetMetricValue(rw http.ResponseWriter, r *http.Request, m Metrics) (Metrics, error) {
-	if s.DataBase != nil {
+	if s.Database.DB != nil {
 		switch m.MType {
 		case "gauge":
 			var value float64
-			err := s.SelectOneGaugeFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&value)
+			err := s.Database.SelectOneGaugeFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&value)
 			if err != nil {
 				loggers.ErrorLogger.Println("db query error:", err)
 				return m, err
@@ -362,7 +362,7 @@ func (s *Server) GetMetricValue(rw http.ResponseWriter, r *http.Request, m Metri
 			}
 		case "counter":
 			var delta int64
-			err := s.SelectOneCounterFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&delta)
+			err := s.Database.SelectOneCounterFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&delta)
 			if err != nil {
 				return m, ErrTypeNotFound
 			}
@@ -463,7 +463,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
 			}
 		}
-		_, err := s.InsertUpdateGaugeToDatabaseStmt.Exec(m.ID, *m.Value)
+		_, err := s.Database.InsertUpdateGaugeToDatabaseStmt.Exec(m.ID, *m.Value)
 		if err != nil {
 			return err
 		}
@@ -480,22 +480,22 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 			}
 		}
 		var numberOfMetrics int
-		err := s.CountIDsInDatabaseStmt.QueryRow(m.ID).Scan(&numberOfMetrics)
+		err := s.Database.CountIDsInDatabaseStmt.QueryRow(m.ID).Scan(&numberOfMetrics)
 		if err != nil {
 			return err
 		}
 		if numberOfMetrics != 0 {
 			var delta int64
-			err = s.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
+			err = s.Database.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
 			if err != nil {
 				return err
 			}
-			_, err = s.UpdateCounterToDatabaseStmt.Exec(m.ID, delta+*m.Delta)
+			_, err = s.Database.UpdateCounterToDatabaseStmt.Exec(m.ID, delta+*m.Delta)
 			if err != nil {
 				return err
 			}
 		} else {
-			_, err = s.InsertCounterToDatabaseStmt.Exec(m.ID, *m.Delta)
+			_, err = s.Database.InsertCounterToDatabaseStmt.Exec(m.ID, *m.Delta)
 			if err != nil {
 				return err
 			}
@@ -509,7 +509,7 @@ func (s *Server) storeMetricsToDatabase(m Metrics) error {
 func (s *Server) StoreManyMetrics(metrics []Metrics) error {
 	var err error
 	for _, m := range metrics {
-		if s.DataBase != nil {
+		if s.Database.DB != nil {
 			err = s.storeMetricsToDatabase(m)
 		} else {
 			err = s.storeMetrics(m)

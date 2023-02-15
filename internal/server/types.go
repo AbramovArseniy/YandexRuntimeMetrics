@@ -37,13 +37,8 @@ type fileHandler struct {
 	Restore       bool
 }
 
-type Server struct {
-	Addr                             string
-	storage                          MemStorage
-	FileHandler                      fileHandler
-	Debug                            bool
-	Key                              string
-	DataBase                         *sql.DB
+type Database struct {
+	DB                               *sql.DB
 	InsertCounterToDatabaseStmt      *sql.Stmt
 	UpdateCounterToDatabaseStmt      *sql.Stmt
 	InsertUpdateGaugeToDatabaseStmt  *sql.Stmt
@@ -51,6 +46,15 @@ type Server struct {
 	SelectOneGaugeFromDatabaseStmt   *sql.Stmt
 	SelectOneCounterFromDatabaseStmt *sql.Stmt
 	CountIDsInDatabaseStmt           *sql.Stmt
+}
+
+type Server struct {
+	Addr        string
+	storage     MemStorage
+	FileHandler fileHandler
+	Debug       bool
+	Key         string
+	Database    Database
 }
 
 func NewServer(address string, storeInterval time.Duration, storeFile string, restore bool, debug bool, key string, db *sql.DB) *Server {
@@ -106,15 +110,17 @@ func NewServer(address string, storeInterval time.Duration, storeFile string, re
 			StoreFile:     storeFile,
 			Restore:       restore,
 		},
-		Debug:                            debug,
-		Key:                              key,
-		DataBase:                         db,
-		InsertCounterToDatabaseStmt:      insertCounterStmt,
-		UpdateCounterToDatabaseStmt:      updateCounterStmt,
-		InsertUpdateGaugeToDatabaseStmt:  insertGaugeStmt,
-		SelectAllFromDatabaseStmt:        selectAllStmt,
-		SelectOneGaugeFromDatabaseStmt:   selectOneGaugeStmt,
-		SelectOneCounterFromDatabaseStmt: selectOneCounterStmt,
-		CountIDsInDatabaseStmt:           countIDsStmt,
+		Debug: debug,
+		Key:   key,
+		Database: Database{
+			DB:                               db,
+			InsertCounterToDatabaseStmt:      insertCounterStmt,
+			UpdateCounterToDatabaseStmt:      updateCounterStmt,
+			InsertUpdateGaugeToDatabaseStmt:  insertGaugeStmt,
+			SelectAllFromDatabaseStmt:        selectAllStmt,
+			SelectOneGaugeFromDatabaseStmt:   selectOneGaugeStmt,
+			SelectOneCounterFromDatabaseStmt: selectOneCounterStmt,
+			CountIDsInDatabaseStmt:           countIDsStmt,
+		},
 	}
 }
