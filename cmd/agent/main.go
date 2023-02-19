@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -12,15 +13,24 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 )
 
-func setAgentParams() (string, time.Duration, time.Duration, string) {
+const (
+	defaultPollInterval   = 2 * time.Second
+	defaultReportInterval = 10 * time.Second
+	defaultAddress        = "localhost:8080"
+	defaultRateLimit      = 100
+)
+
+func setAgentParams() (string, time.Duration, time.Duration, string, int) {
 	var (
 		flagPollInterval   time.Duration
 		flagReportInterval time.Duration
+		flagRateLimit      int
 		flagAddress        string
 		flagKey            string
 	)
 	flag.DurationVar(&flagPollInterval, "p", defaultPollInterval, "poll_metrics_interval")
 	flag.DurationVar(&flagReportInterval, "r", defaultReportInterval, "report_metrics_interval")
+	flag.IntVar(&flagRateLimit, "l", defaultRateLimit, "rate_limit")
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
 	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.Parse()
@@ -43,6 +53,16 @@ func setAgentParams() (string, time.Duration, time.Duration, string) {
 			reportInterval = flagReportInterval
 		}
 	}
+	var rateLimit int
+	if strRateLimit, exists := os.LookupEnv("RATE_LIMIT"); !exists {
+		rateLimit = flagRateLimit
+	} else {
+		var err error
+		if rateLimit, err = strconv.Atoi(strRateLimit); err != nil || rateLimit <= 0 {
+			log.Println("couldn't parse report duration from", strRateLimit)
+			rateLimit = flagRateLimit
+		}
+	}
 	address, exists := os.LookupEnv("ADDRESS")
 	if !exists {
 		address = flagAddress
@@ -51,7 +71,7 @@ func setAgentParams() (string, time.Duration, time.Duration, string) {
 	if !exists {
 		key = flagKey
 	}
-	return address, pollInterval, reportInterval, key
+	return address, pollInterval, reportInterval, key, rateLimit
 }
 
 func main() {

@@ -2,6 +2,6 @@ package agent
 
 const (
 	DefaultProtocol = "http://"
-	DefaultHost     = "127.0.0.1"
+	DefaultHost     = "localhost"
 	DefaultPort     = "8080"
 )
