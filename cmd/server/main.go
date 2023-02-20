@@ -94,11 +94,6 @@ func setDatabase(db *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("could not create migration: %w", err)
 	}
-
-	if err != nil {
-		loggers.ErrorLogger.Println("error while creating table:", err)
-		return err
-	}
 	if err = m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err
 	}
