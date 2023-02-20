@@ -30,7 +30,7 @@ type metricCollector struct {
 }
 
 func newCollector() *metricCollector {
-	var delta int64
+	var delta int64 = 0
 	return &metricCollector{
 		PollCount: Metrics{
 			ID:    "PollCount",

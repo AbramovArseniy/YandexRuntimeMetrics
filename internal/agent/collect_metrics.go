@@ -45,33 +45,33 @@ func (a *Agent) CollectRuntimeMetrics() {
 		TotalAlloc    = float64(stats.TotalAlloc)
 	)
 	a.collector.RuntimeMetrics = []Metrics{
-		{ID: "Alloc", Value: &Alloc},
-		{ID: "BuckHashSys", Value: &BuckHashSys},
-		{ID: "Frees", Value: &Frees},
-		{ID: "GCCPUFraction", Value: &GCCPUFraction},
-		{ID: "GCSys", Value: &GCSys},
-		{ID: "HeapAlloc", Value: &HeapAlloc},
-		{ID: "HeapIdle", Value: &HeapIdle},
-		{ID: "HeapInuse", Value: &HeapInuse},
-		{ID: "HeapObjects", Value: &HeapObjects},
-		{ID: "HeapReleased", Value: &HeapReleased},
-		{ID: "HeapSys", Value: &HeapSys},
-		{ID: "LastGC", Value: &LastGC},
-		{ID: "Lookups", Value: &Lookups},
-		{ID: "MCacheInuse", Value: &MCacheInuse},
-		{ID: "MCacheSys", Value: &MCacheSys},
-		{ID: "MSpanInuse", Value: &MSpanInuse},
-		{ID: "MSpanSys", Value: &MSpanSys},
-		{ID: "Mallocs", Value: &Mallocs},
-		{ID: "NextGC", Value: &NextGC},
-		{ID: "NumForcedGC", Value: &NumForcedGC},
-		{ID: "NumGC", Value: &NumGC},
-		{ID: "OtherSys", Value: &OtherSys},
-		{ID: "PauseTotalNs", Value: &PauseTotalNs},
-		{ID: "StackInuse", Value: &StackInuse},
-		{ID: "StackSys", Value: &StackSys},
-		{ID: "Sys", Value: &Sys},
-		{ID: "TotalAlloc", Value: &TotalAlloc},
+		{ID: "Alloc", MType: "gauge", Value: &Alloc},
+		{ID: "BuckHashSys", MType: "gauge", Value: &BuckHashSys},
+		{ID: "Frees", MType: "gauge", Value: &Frees},
+		{ID: "GCCPUFraction", MType: "gauge", Value: &GCCPUFraction},
+		{ID: "GCSys", MType: "gauge", Value: &GCSys},
+		{ID: "HeapAlloc", MType: "gauge", Value: &HeapAlloc},
+		{ID: "HeapIdle", MType: "gauge", Value: &HeapIdle},
+		{ID: "HeapInuse", MType: "gauge", Value: &HeapInuse},
+		{ID: "HeapObjects", MType: "gauge", Value: &HeapObjects},
+		{ID: "HeapReleased", MType: "gauge", Value: &HeapReleased},
+		{ID: "HeapSys", MType: "gauge", Value: &HeapSys},
+		{ID: "LastGC", MType: "gauge", Value: &LastGC},
+		{ID: "Lookups", MType: "gauge", Value: &Lookups},
+		{ID: "MCacheInuse", MType: "gauge", Value: &MCacheInuse},
+		{ID: "MCacheSys", MType: "gauge", Value: &MCacheSys},
+		{ID: "MSpanInuse", MType: "gauge", Value: &MSpanInuse},
+		{ID: "MSpanSys", MType: "gauge", Value: &MSpanSys},
+		{ID: "Mallocs", MType: "gauge", Value: &Mallocs},
+		{ID: "NextGC", MType: "gauge", Value: &NextGC},
+		{ID: "NumForcedGC", MType: "gauge", Value: &NumForcedGC},
+		{ID: "NumGC", MType: "gauge", Value: &NumGC},
+		{ID: "OtherSys", MType: "gauge", Value: &OtherSys},
+		{ID: "PauseTotalNs", MType: "gauge", Value: &PauseTotalNs},
+		{ID: "StackInuse", MType: "gauge", Value: &StackInuse},
+		{ID: "StackSys", MType: "gauge", Value: &StackSys},
+		{ID: "Sys", MType: "gauge", Value: &Sys},
+		{ID: "TotalAlloc", MType: "gauge", Value: &TotalAlloc},
 	}
 	*(a.collector.PollCount.Delta)++
 	loggers.InfoLogger.Println("Collected GaugeMetrics")
@@ -80,7 +80,7 @@ func (a *Agent) CollectRuntimeMetrics() {
 func (s *metricCollector) CollectRandomValueMetric() Metrics {
 	rand.Seed(time.Now().Unix())
 	value := rand.Float64() * 1000
-	randomValueMetric := Metrics{ID: "RandomValue", Value: &value}
+	randomValueMetric := Metrics{ID: "RandomValue", MType: "gauge", Value: &value}
 	loggers.InfoLogger.Println("Collected RandomValueMectric")
 	return randomValueMetric
 }

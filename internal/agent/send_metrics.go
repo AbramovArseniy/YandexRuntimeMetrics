@@ -75,6 +75,7 @@ func (a *Agent) SendMetric(metric *Metrics) error {
 func (a *Agent) SendAllMetrics() {
 	newMetrics := a.collector.CollectRandomValueMetric()
 	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, newMetrics)
+	a.SendMetric(&a.collector.PollCount)
 	for _, metric := range a.collector.RuntimeMetrics {
 		err := a.SendMetric(&metric)
 		if err != nil {
@@ -82,6 +83,7 @@ func (a *Agent) SendAllMetrics() {
 			return
 		}
 	}
+	*(a.collector.PollCount.Delta) = 0
 	loggers.InfoLogger.Println("Sent Gauge")
 }
 
@@ -90,6 +92,7 @@ func (a *Agent) SendAllMetricsAsButch() {
 	url := a.UpdateAllAddress
 	newMetrics := a.collector.CollectRandomValueMetric()
 	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, newMetrics)
+	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, a.collector.PollCount)
 	var metrics []Metrics
 	for _, metric := range a.collector.RuntimeMetrics {
 		if a.Key != "" {
@@ -145,9 +148,9 @@ func (a *Agent) SendAllMetricsAsButch() {
 		loggers.ErrorLogger.Println("Client.Do() error:", err)
 		return
 	}
-	loggers.InfoLogger.Println("Sent Counter")
 	err = resp.Body.Close()
 	if err != nil {
 		loggers.ErrorLogger.Println("response body close error:", err)
 	}
+	*(a.collector.PollCount.Delta) = 0
 }
