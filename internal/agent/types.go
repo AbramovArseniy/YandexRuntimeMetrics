@@ -17,32 +17,26 @@ type Metrics struct {
 
 type UtilizationData struct {
 	mu              sync.Mutex
-	TotalMemory     Gauge
-	FreeMemory      Gauge
-	CPUutilizations []Gauge
+	TotalMemory     Metrics
+	FreeMemory      Metrics
+	CPUutilizations []Metrics
 	CPUtime         []float64
 	CPUutilLastTime time.Time
 }
 
-type Gauge struct {
-	metricName  string
-	metricValue float64
-}
-
-type Counter struct {
-	metricName  string
-	metricValue int64
-}
-
 type metricCollector struct {
-	GaugeMetrics []Gauge
-	PollCount    int64
+	RuntimeMetrics []Metrics
+	PollCount      Metrics
 }
 
 func newCollector() *metricCollector {
+	var delta int64
 	return &metricCollector{
-		GaugeMetrics: make([]Gauge, 0),
-		PollCount:    0,
+		PollCount: Metrics{
+			ID:    "PollCount",
+			MType: "counter",
+			Delta: &delta,
+		},
 	}
 }
 

@@ -84,7 +84,7 @@ func main() {
 	}
 	numCPU := len(cpuStat)
 	a.UtilData.CPUtime = make([]float64, numCPU)
-	a.UtilData.CPUutilizations = make([]agent.Gauge, numCPU)
+	a.UtilData.CPUutilizations = make([]agent.Metrics, numCPU)
 	go repeating.Repeat(a.CollectRuntimeMetrics, a.PollInterval)
 	go repeating.Repeat(a.CollectUtilizationMetrics, a.PollInterval)
 	go repeating.Repeat(a.SendAllMetricsAsButch, a.ReportInterval)

@@ -37,17 +37,16 @@ func hash(src, key string) string {
 	return fmt.Sprintf("%x", dst)
 }
 
-func (a *Agent) SendGauge(metric Gauge) error {
+func (a *Agent) SendMetric(metric *Metrics) error {
 	url := a.UpdateAddress
-	m := Metrics{
-		ID:    metric.metricName,
-		MType: "gauge",
-		Value: &metric.metricValue,
-	}
 	if a.Key != "" {
-		m.Hash = hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), a.Key)
+		if metric.MType == "gauge" {
+			metric.Hash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+		} else {
+			metric.Hash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), a.Key)
+		}
 	}
-	byteJSON, err := json.Marshal(m)
+	byteJSON, err := json.Marshal(metric)
 	if err != nil {
 		loggers.ErrorLogger.Println("json Marshal error:", err)
 		return err
@@ -73,124 +72,59 @@ func (a *Agent) SendGauge(metric Gauge) error {
 	return resp.Body.Close()
 }
 
-func (a *Agent) SendCounter(metric Counter) error {
-	url := a.UpdateAddress
-	m := Metrics{
-		ID:    metric.metricName,
-		MType: "counter",
-		Delta: &metric.metricValue,
-	}
-	if a.Key != "" {
-		m.Hash = hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), a.Key)
-	}
-	byteJSON, err := json.Marshal(m)
-	if err != nil {
-		loggers.ErrorLogger.Println("json Marshal error:", err)
-		return err
-	}
-	compressedJSON, err := Compress(byteJSON)
-	if err != nil {
-		loggers.ErrorLogger.Printf("Compress error: %v", err)
-	}
-	body := strings.NewReader(string(compressedJSON))
-	req, err := http.NewRequest("POST", url, body)
-	if err != nil {
-		loggers.ErrorLogger.Println("Request Creation error")
-		return err
-	}
-	req.Close = true
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-	resp, err := a.sender.client.Do(req)
-	if err != nil {
-		loggers.ErrorLogger.Println("Client.Do() error:", err)
-		return err
-	}
-	return resp.Body.Close()
-}
-
 func (a *Agent) SendAllMetrics() {
 	newMetrics := a.collector.CollectRandomValueMetric()
-	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
-	for _, metric := range a.collector.GaugeMetrics {
-		err := a.SendGauge(metric)
+	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, newMetrics)
+	for _, metric := range a.collector.RuntimeMetrics {
+		err := a.SendMetric(&metric)
 		if err != nil {
 			loggers.ErrorLogger.Println("can't send Gauge " + err.Error())
 			return
 		}
 	}
 	loggers.InfoLogger.Println("Sent Gauge")
-	metricCounter := Counter{metricName: "PollCount", metricValue: a.collector.PollCount}
-	a.collector.PollCount = 0
-	err := a.SendCounter(metricCounter)
-	if err != nil {
-		loggers.ErrorLogger.Println("can't send Counter " + err.Error())
-		return
-	}
-	loggers.InfoLogger.Println("Sent Counter")
 }
 
 func (a *Agent) SendAllMetricsAsButch() {
+	var metricHash string
 	url := a.UpdateAllAddress
 	newMetrics := a.collector.CollectRandomValueMetric()
-	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
+	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, newMetrics)
 	var metrics []Metrics
-	for _, metric := range a.collector.GaugeMetrics {
-		var metricHash string
+	for _, metric := range a.collector.RuntimeMetrics {
 		if a.Key != "" {
-			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.metricName, metric.metricValue), a.Key)
+			if metric.MType == "gauge" {
+				metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+			} else {
+				metricHash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), a.Key)
+			}
+			metric.Hash = metricHash
 		}
-		var value = metric.metricValue
-		metrics = append(metrics, Metrics{
-			ID:    metric.metricName,
-			MType: "gauge",
-			Value: &value,
-			Hash:  metricHash,
-		})
-
+		metrics = append(metrics, metric)
 	}
 	for _, metric := range a.UtilData.CPUutilizations {
-		var metricHash string
 		if a.Key != "" {
-			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.metricName, metric.metricValue), a.Key)
+			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+			metric.Hash = metricHash
 		}
-		var value = metric.metricValue
-		metrics = append(metrics, Metrics{
-			ID:    metric.metricName,
-			MType: "gauge",
-			Value: &value,
-			Hash:  metricHash,
-		})
+		metrics = append(metrics, metric)
 	}
-	var metricHash string
 	metric := a.UtilData.TotalMemory
 	if a.Key != "" {
-		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.metricName, metric.metricValue), a.Key)
+		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+		metric.Hash = metricHash
 	}
-	var value = metric.metricValue
-	metrics = append(metrics, Metrics{
-		ID:    metric.metricName,
-		MType: "gauge",
-		Value: &value,
-		Hash:  metricHash,
-	})
 	metric = a.UtilData.FreeMemory
-
-	loggers.InfoLogger.Println("Sent Gauge")
 	if a.Key != "" {
-		metricHash = hash(fmt.Sprintf("%s:counter:%d", "PollCount", a.collector.PollCount), a.Key)
+		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+		metric.Hash = metricHash
 	}
-	var delta = a.collector.PollCount
-	metrics = append(metrics, Metrics{
-		ID:    "PollCount",
-		MType: "counter",
-		Delta: &delta,
-		Hash:  metricHash,
-	})
-	a.collector.PollCount = 0
+	metrics = append(metrics, metric)
+
+	loggers.InfoLogger.Println("Sent Metrics")
 	jsonMetrics, err := json.Marshal(metrics)
 	if err != nil {
-		loggers.ErrorLogger.Println("can't send Counter " + err.Error())
+		loggers.ErrorLogger.Println("cannot marshal metrics: " + err.Error())
 		return
 	}
 	compressedJSON, err := Compress(jsonMetrics)
