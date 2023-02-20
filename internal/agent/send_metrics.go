@@ -147,10 +147,36 @@ func (a *Agent) SendAllMetricsAsButch() {
 			Value: &value,
 			Hash:  metricHash,
 		})
-		loggers.DebugLogger.Println(metrics, metric.metricName, metric.metricValue)
+
 	}
-	loggers.InfoLogger.Println("Sent Gauge")
+	for _, metric := range a.UtilData.CPUutilizations {
+		var metricHash string
+		if a.Key != "" {
+			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.metricName, metric.metricValue), a.Key)
+		}
+		var value = metric.metricValue
+		metrics = append(metrics, Metrics{
+			ID:    metric.metricName,
+			MType: "gauge",
+			Value: &value,
+			Hash:  metricHash,
+		})
+	}
 	var metricHash string
+	metric := a.UtilData.TotalMemory
+	if a.Key != "" {
+		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.metricName, metric.metricValue), a.Key)
+	}
+	var value = metric.metricValue
+	metrics = append(metrics, Metrics{
+		ID:    metric.metricName,
+		MType: "gauge",
+		Value: &value,
+		Hash:  metricHash,
+	})
+	metric = a.UtilData.FreeMemory
+
+	loggers.InfoLogger.Println("Sent Gauge")
 	if a.Key != "" {
 		metricHash = hash(fmt.Sprintf("%s:counter:%d", "PollCount", a.collector.PollCount), a.Key)
 	}
@@ -163,7 +189,6 @@ func (a *Agent) SendAllMetricsAsButch() {
 	})
 	a.collector.PollCount = 0
 	jsonMetrics, err := json.Marshal(metrics)
-	loggers.DebugLogger.Println(string(jsonMetrics))
 	if err != nil {
 		loggers.ErrorLogger.Println("can't send Counter " + err.Error())
 		return

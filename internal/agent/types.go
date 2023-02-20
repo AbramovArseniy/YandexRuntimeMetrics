@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -12,6 +13,15 @@ type Metrics struct {
 	Delta *int64   `json:"delta,omitempty"`
 	Value *float64 `json:"value,omitempty"`
 	Hash  string   `json:"hash,omitempty"`
+}
+
+type UtilizationData struct {
+	mu              sync.Mutex
+	TotalMemory     Gauge
+	FreeMemory      Gauge
+	CPUutilizations []Gauge
+	CPUtime         []float64
+	CPUutilLastTime time.Time
 }
 
 type Gauge struct {
@@ -56,6 +66,7 @@ type Agent struct {
 	Key              string
 	ReportInterval   time.Duration
 	RateLimit        int
+	UtilData         UtilizationData
 }
 
 func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration, key string, rateLimit int) *Agent {

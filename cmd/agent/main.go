@@ -11,6 +11,7 @@ import (
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
+	"github.com/shirou/gopsutil/cpu"
 )
 
 const (
@@ -76,7 +77,16 @@ func setAgentParams() (string, time.Duration, time.Duration, string, int) {
 
 func main() {
 	a := agent.NewAgent(setAgentParams())
+	cpuStat, err := cpu.Times(true)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+	numCPU := len(cpuStat)
+	a.UtilData.CPUtime = make([]float64, numCPU)
+	a.UtilData.CPUutilizations = make([]agent.Gauge, numCPU)
 	go repeating.Repeat(a.CollectRuntimeMetrics, a.PollInterval)
+	go repeating.Repeat(a.CollectUtilizationMetrics, a.PollInterval)
 	go repeating.Repeat(a.SendAllMetricsAsButch, a.ReportInterval)
 	log.Println("Agent started")
 	cancelSignal := make(chan os.Signal, 1)

@@ -1,17 +1,20 @@
 package agent
 
 import (
+	"log"
 	"math/rand"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
+	"github.com/shirou/gopsutil/cpu"
+	"github.com/shirou/gopsutil/mem"
 )
 
 func (a *Agent) CollectRuntimeMetrics() {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
-	a.collector.PollCount += 1
 	a.collector.GaugeMetrics = []Gauge{
 		{metricName: "Alloc", metricValue: float64(stats.Alloc)},
 		{metricName: "BuckHashSys", metricValue: float64(stats.BuckHashSys)},
@@ -49,4 +52,40 @@ func (s *metricCollector) CollectRandomValueMetric() Gauge {
 	randomValueMetric := Gauge{metricName: "RandomValue", metricValue: rand.Float64() * 1000}
 	loggers.InfoLogger.Println("Collected RandomValueMectric")
 	return randomValueMetric
+}
+
+func (a *Agent) CollectUtilizationMetrics() {
+	m, err := mem.VirtualMemory()
+	if err != nil {
+		loggers.ErrorLogger.Println("error access to virtual memory: ", err)
+	}
+
+	a.UtilData.mu.Lock()
+	timeNow := time.Now()
+	timeDiff := timeNow.Sub(a.UtilData.CPUutilLastTime)
+
+	a.UtilData.CPUutilLastTime = timeNow
+	a.UtilData.TotalMemory = Gauge{
+		metricName:  "TotalMemory",
+		metricValue: float64(m.Total),
+	}
+	a.UtilData.FreeMemory = Gauge{
+		metricName:  "FreeMemory",
+		metricValue: float64(m.Free),
+	}
+
+	cpus, err := cpu.Times(true)
+	if err != nil {
+		log.Println(err)
+	}
+	for i := range cpus {
+		newCPUTime := cpus[i].User + cpus[i].System
+		cpuUtilization := (newCPUTime - a.UtilData.CPUtime[i]) * 1000 / float64(timeDiff.Milliseconds())
+		a.UtilData.CPUutilizations[i] = Gauge{
+			metricName:  "CPUutilization" + strconv.Itoa(i+1),
+			metricValue: cpuUtilization,
+		}
+		a.UtilData.CPUtime[i] = newCPUTime
+	}
+	a.UtilData.mu.Unlock()
 }
