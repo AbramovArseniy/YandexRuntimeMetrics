@@ -292,6 +292,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		return
 	}
 	body, err := io.ReadAll(r.Body)
+	loggers.DebugLogger.Println(string(body))
 	rw.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		http.Error(rw, "reading body error", http.StatusInternalServerError)
