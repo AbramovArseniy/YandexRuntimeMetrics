@@ -48,6 +48,8 @@ func hash(src, key string) string {
 
 func (w *metricWorker) SendMetric() error {
 	for metric := range w.ch {
+		w.mu.Lock()
+		defer w.mu.Unlock()
 		url := w.a.UpdateAddress
 		if w.a.Key != "" {
 			if metric.MType == "gauge" {
