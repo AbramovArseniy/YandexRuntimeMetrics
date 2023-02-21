@@ -1,31 +1,20 @@
 package main
 
 import (
+	"context"
 	"database/sql"
-	"errors"
 	"flag"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database/postgres"
-
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
-)
-
-const (
-	defaultAddress       = "localhost:8080"
-	defaultStoreInterval = 300 * time.Second
-	defaultStoreFile     = "/tmp/devops-metrics-db.json"
-	defaultRestore       = true
 )
 
 func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
@@ -84,17 +73,11 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 }
 
 func setDatabase(db *sql.DB) error {
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, createTableQuerySQL)
+
 	if err != nil {
-		return fmt.Errorf("could not create driver: %w", err)
-	}
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://./cmd/server/migrations",
-		"postgres", driver)
-	if err != nil {
-		return fmt.Errorf("could not create migration: %w", err)
-	}
-	if err = m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
+		loggers.ErrorLogger.Println("error while creating table:", err)
 		return err
 	}
 	return nil
