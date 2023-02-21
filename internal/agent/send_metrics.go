@@ -117,6 +117,7 @@ func (a *Agent) SendAllMetricsAsButch() {
 		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
 		metric.Hash = metricHash
 	}
+	metrics = append(metrics, metric)
 	metric = a.UtilData.FreeMemory
 	if a.Key != "" {
 		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
