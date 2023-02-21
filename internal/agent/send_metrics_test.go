@@ -1,11 +1,15 @@
 package agent
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -60,8 +64,16 @@ func TestSendCounter(t *testing.T) {
 			srv.Start()
 
 			defer srv.Close()
-
-			err = a.SendMetric(&metric)
+			recordCh := make(chan Metrics)
+			ctx := context.Background()
+			g, _ := errgroup.WithContext(ctx)
+			w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			g.Go(w.SendMetric)
+			readW.ReadMetrics(ctx)
+			a.collector.RuntimeMetrics = []Metrics{metric}
+			a.SendAllMetrics()
+			err = g.Wait()
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendCounter() error = %v, expectError %v", err, test.expectError)
 				return
@@ -117,8 +129,16 @@ func TestSendGauge(t *testing.T) {
 			srv.Start()
 
 			defer srv.Close()
-
-			err = a.SendMetric(&metric)
+			recordCh := make(chan Metrics)
+			ctx := context.Background()
+			g, _ := errgroup.WithContext(ctx)
+			w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			g.Go(w.SendMetric)
+			readW.ReadMetrics(ctx)
+			a.collector.RuntimeMetrics = []Metrics{metric}
+			a.SendAllMetrics()
+			err = g.Wait()
 			if (err != nil) != test.expectError {
 				t.Errorf("error Sending Gauge error = %v, expectError %v", err, test.expectError)
 				return
