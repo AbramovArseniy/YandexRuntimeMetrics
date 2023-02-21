@@ -1,9 +1,10 @@
 package main
 
 import (
-	"context"
 	"database/sql"
+	"errors"
 	"flag"
+	"fmt"
 	"net/http"
 	"os"
 	"strconv"
@@ -15,6 +16,9 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const (
@@ -89,11 +93,22 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 }
 
 func setDatabase(db *sql.DB) error {
-	ctx := context.Background()
-	_, err := db.ExecContext(ctx, createTableQuerySQL)
+	driver, err := postgres.WithInstance(db, &postgres.Config{})
+	if err != nil {
+		return fmt.Errorf("could not create driver: %w", err)
+	}
+	m, err := migrate.NewWithDatabaseInstance(
+		"file://../../migrations",
+		"postgres", driver)
+	if err != nil {
+		return fmt.Errorf("could not create migration: %w", err)
+	}
 
 	if err != nil {
 		loggers.ErrorLogger.Println("error while creating table:", err)
+		return err
+	}
+	if err = m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return err
 	}
 	return nil
