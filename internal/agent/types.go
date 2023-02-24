@@ -11,6 +11,7 @@ type Metrics struct {
 	MType string   `json:"type"`
 	Delta *int64   `json:"delta,omitempty"`
 	Value *float64 `json:"value,omitempty"`
+	Hash  string   `json:"hash,omitempty"`
 }
 
 type Gauge struct {
@@ -46,21 +47,25 @@ func NewSender() *metricSender {
 }
 
 type Agent struct {
-	sender         *metricSender
-	collector      *metricCollector
-	Address        string
-	UpdateAddress  string
-	PollInterval   time.Duration
-	ReportInterval time.Duration
+	sender           *metricSender
+	collector        *metricCollector
+	Address          string
+	UpdateAddress    string
+	UpdateAllAddress string
+	PollInterval     time.Duration
+	Key              string
+	ReportInterval   time.Duration
 }
 
-func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration) *Agent {
+func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration, key string) *Agent {
 	return &Agent{
-		Address:        addr,
-		UpdateAddress:  fmt.Sprintf("http://%s/update/", addr),
-		sender:         NewSender(),
-		collector:      newCollector(),
-		PollInterval:   pollInterval,
-		ReportInterval: reportInterval,
+		Address:          addr,
+		UpdateAddress:    fmt.Sprintf("http://%s/update/", addr),
+		UpdateAllAddress: fmt.Sprintf("http://%s/updates/", addr),
+		sender:           NewSender(),
+		collector:        newCollector(),
+		PollInterval:     pollInterval,
+		ReportInterval:   reportInterval,
+		Key:              key,
 	}
 }

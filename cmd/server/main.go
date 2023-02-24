@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"flag"
 	"net/http"
 	"os"
@@ -8,32 +10,31 @@ import (
 	"strings"
 	"time"
 
+	_ "github.com/jackc/pgx/v5/stdlib"
+
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
 )
 
-const (
-	defaultAddress       = "localhost:8080"
-	defaultStoreInterval = 300 * time.Second
-	defaultStoreFile     = "/tmp/devops-metrics-db.json"
-	defaultRestore       = true
-)
-
-func setServerParams() (string, time.Duration, string, bool, bool) {
+func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
 	var (
 		flagRestore, restore             bool
 		flagStoreFile, storeFile         string
 		flagAddress                      string
 		flagStoreInterval, storeInterval time.Duration
 		flagDebug                        bool
+		flagKey                          string
+		flagDataBase                     string
 	)
 
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
 	flag.StringVar(&flagStoreFile, "f", defaultStoreFile, "store_file")
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
 	flag.DurationVar(&flagStoreInterval, "i", defaultStoreInterval, "store_interval_in_seconds")
-	flag.BoolVar(&flagDebug, "d", false, "debug_true/false")
+	flag.BoolVar(&flagDebug, "debug", false, "debug_true/false")
+	flag.StringVar(&flagKey, "k", "", "hash_key")
+	flag.StringVar(&flagDataBase, "d", "", "db_address")
 	flag.Parse()
 	address, exists := os.LookupEnv("ADDRESS")
 	if !exists {
@@ -60,28 +61,64 @@ func setServerParams() (string, time.Duration, string, bool, bool) {
 			restore = flagRestore
 		}
 	}
-	return address, storeInterval, storeFile, restore, flagDebug
+	key, exists := os.LookupEnv("KEY")
+	if !exists {
+		key = flagKey
+	}
+	database, exists := os.LookupEnv("DATABASE_DSN")
+	if !exists {
+		database = flagDataBase
+	}
+	return address, storeInterval, storeFile, restore, flagDebug, key, database
+}
+
+func setDatabase(db *sql.DB) error {
+	ctx := context.Background()
+	_, err := db.ExecContext(ctx, createTableQuerySQL)
+
+	if err != nil {
+		loggers.ErrorLogger.Println("error while creating table:", err)
+		return err
+	}
+	return nil
 }
 
 func StartServer() {
-	s := server.NewServer(setServerParams())
+	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
+	var db *sql.DB
+	var err error
+	if dbAddress != "" {
+		db, err = sql.Open("pgx", dbAddress)
+		if err != nil {
+			loggers.ErrorLogger.Println("opening DB error:", err)
+			db = nil
+		} else {
+			setDatabase(db)
+		}
+		defer db.Close()
+	} else {
+		db = nil
+	}
+	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
 	srv := &http.Server{
 		Addr:    s.Addr,
 		Handler: handler,
 	}
-	if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
-		if err := os.MkdirAll(s.FileHandler.StoreFile[:strings.LastIndex(s.FileHandler.StoreFile, "/")], 0777); err != nil {
-			loggers.ErrorLogger.Println("failed to create directory:", err)
+	if db == nil {
+		if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
+			if err := os.MkdirAll(s.FileHandler.StoreFile[:strings.LastIndex(s.FileHandler.StoreFile, "/")], 0777); err != nil {
+				loggers.ErrorLogger.Println("failed to create directory:", err)
+			}
 		}
-	}
-	if s.FileHandler.Restore {
-		s.RestoreMetricsFromFile()
+		if s.FileHandler.Restore {
+			s.RestoreMetricsFromFile()
+		}
+		go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
 	}
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
-	go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
-	err := srv.ListenAndServe()
+	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)
 	}

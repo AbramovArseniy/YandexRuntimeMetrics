@@ -11,5 +11,7 @@ func (s *Server) Router() chi.Router {
 	router.Post("/update/{type}/{name}/{value}", s.PostMetricHandler)
 	router.Post("/update/", s.PostMetricJSONHandler)
 	router.Post("/value/", s.GetMetricPostJSONHandler)
+	router.Get("/ping", s.GetPingDBHandler)
+	router.Post("/updates/", s.PostUpdateManyMetricsHandler)
 	return router
 }

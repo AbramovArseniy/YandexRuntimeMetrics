@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - iter8
+      - iter12
 
 jobs:
 
@@ -46,7 +46,7 @@ jobs:
       - name: Build agent binary
         run: |
           cd cmd/agent
-          go build -o agent
+          go build -o agent --buildvcs=false
 
 # Соглашение:
 #   Во всех заданиях, нужно обрабатывать все пограничные случаи и негатив-кейсы.
@@ -109,7 +109,7 @@ jobs:
       - name: Build server binary
         run: |
           cd cmd/server
-          go build -o server
+          go build -o server --buildvcs=false
 
 # II. Задание ко второму инкременту.
 # Разработать сервер по сбору рантайм метрик, который собирает репорты от агентов по протоколу http.

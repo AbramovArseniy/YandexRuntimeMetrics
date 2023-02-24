@@ -71,6 +71,7 @@ func (s *Server) RestoreMetricsFromFile() {
 	scanner := bufio.NewScanner(file)
 	if err != nil {
 		loggers.ErrorLogger.Printf("Failed to open file: %s, %v", s.FileHandler.StoreFile, err)
+		return
 	}
 	defer file.Close()
 	for scanner.Scan() {
