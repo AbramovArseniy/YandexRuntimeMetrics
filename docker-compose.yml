@@ -1,0 +1,60 @@
+version: "Compose specification"
+
+services:
+  postgres:
+    image: postgres
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    expose:
+      - "5432"
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: [ "CMD", "pg_isready", "-q", "-d", "postgres", "-U", "postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: "no"
+    stop_grace_period: 10s
+  server:
+    image: server
+    restart: "no"
+    stop_grace_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ADDRESS=${ADDRESS:-server:8080}
+      - STORE_INTERVAL=${STORE_INTERVAL:-300s}
+      - STORE_FILE=${STORE_FILE:-}
+      - RESTORE=${RESTORE:-true}
+      - KEY=${KEY:-}
+      - DATABASE_DSN=${DATABASE_DSN:-postgres://postgres:postgres@postgres:5432/postgres?sslmode=disable}
+    build:
+      context: .
+      args:
+        - GOLANG_IMAGE_TAG=${GOLANG_IMAGE_TAG:-1.19-alpine3.17}
+        - ALPINE_IMAGE_TAG=${ALPINE_IMAGE_TAG:-3.17}
+      dockerfile: Dockerfile
+      target: server
+  agent:
+    image: agent
+    restart: "no"
+    stop_grace_period: 10s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ADDRESS=${ADDRESS:-server:8080}
+      - REPORT_INTERVAL=${REPORT_INTERVAL:-10s}
+      - POLL_INTERVAL=${POLL_INTERVAL:-2s}
+      - KEY=${KEY:-}
+      - RATE_LIMIT=${RATE_LIMIT:-}
+    build:
+      context: .
+      args:
+        - GOLANG_IMAGE_TAG=${GOLANG_IMAGE_TAG:-1.19-alpine3.17}
+        - ALPINE_IMAGE_TAG=${ALPINE_IMAGE_TAG:-3.17}
+      dockerfile: Dockerfile
+      target: agent

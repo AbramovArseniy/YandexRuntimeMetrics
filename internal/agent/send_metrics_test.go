@@ -1,11 +1,15 @@
 package agent
 
 import (
+	"context"
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -34,12 +38,13 @@ func TestSendCounter(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "")
+	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			metric := Counter{
-				metricName:  test.metric.name,
-				metricValue: test.metric.value,
+			metric := Metrics{
+				ID:    test.metric.name,
+				MType: "counter",
+				Delta: &test.metric.value,
 			}
 			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
 			if err != nil {
@@ -59,8 +64,18 @@ func TestSendCounter(t *testing.T) {
 			srv.Start()
 
 			defer srv.Close()
-
-			err = a.SendCounter(metric)
+			ctx := context.Background()
+			g, _ := errgroup.WithContext(ctx)
+			recordCh := make(chan Metrics)
+			a.collector.RuntimeMetrics = []Metrics{metric}
+			for i := 0; i < a.RateLimit; i++ {
+				w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+				g.Go(w.SendMetric)
+			}
+			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			readW.ReadMetrics(ctx)
+			close(recordCh)
+			err = g.Wait()
 			if (err != nil) != test.expectError {
 				t.Errorf("counter.SendCounter() error = %v, expectError %v", err, test.expectError)
 				return
@@ -91,12 +106,12 @@ func TestSendGauge(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "")
+	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			metric := Gauge{
-				metricName:  test.metric.name,
-				metricValue: test.metric.value,
+			metric := Metrics{
+				ID:    test.metric.name,
+				Value: &test.metric.value,
 			}
 			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
 			if err != nil {
@@ -117,9 +132,20 @@ func TestSendGauge(t *testing.T) {
 
 			defer srv.Close()
 
-			err = a.SendGauge(metric)
+			ctx := context.Background()
+			g, _ := errgroup.WithContext(ctx)
+			recordCh := make(chan Metrics)
+			a.collector.RuntimeMetrics = []Metrics{metric}
+			for i := 0; i < a.RateLimit; i++ {
+				w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+				g.Go(w.SendMetric)
+			}
+			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			readW.ReadMetrics(ctx)
+			close(recordCh)
+			err = g.Wait()
 			if (err != nil) != test.expectError {
-				t.Errorf("counter.SendGauge() error = %v, expectError %v", err, test.expectError)
+				t.Errorf("error Sending Gauge error = %v, expectError %v", err, test.expectError)
 				return
 			}
 		})

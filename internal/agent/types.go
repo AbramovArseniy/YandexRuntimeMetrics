@@ -3,6 +3,7 @@ package agent
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -14,25 +15,28 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`
 }
 
-type Gauge struct {
-	metricName  string
-	metricValue float64
-}
-
-type Counter struct {
-	metricName  string
-	metricValue int64
+type UtilizationData struct {
+	mu              sync.Mutex
+	TotalMemory     Metrics
+	FreeMemory      Metrics
+	CPUutilizations []Metrics
+	CPUtime         []float64
+	CPUutilLastTime time.Time
 }
 
 type metricCollector struct {
-	GaugeMetrics []Gauge
-	PollCount    int64
+	RuntimeMetrics []Metrics
+	PollCount      Metrics
 }
 
 func newCollector() *metricCollector {
+	var delta int64 = 0
 	return &metricCollector{
-		GaugeMetrics: make([]Gauge, 0),
-		PollCount:    0,
+		PollCount: Metrics{
+			ID:    "PollCount",
+			MType: "counter",
+			Delta: &delta,
+		},
 	}
 }
 
@@ -55,9 +59,11 @@ type Agent struct {
 	PollInterval     time.Duration
 	Key              string
 	ReportInterval   time.Duration
+	RateLimit        int
+	UtilData         UtilizationData
 }
 
-func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration, key string) *Agent {
+func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration, key string, rateLimit int) *Agent {
 	return &Agent{
 		Address:          addr,
 		UpdateAddress:    fmt.Sprintf("http://%s/update/", addr),
@@ -67,5 +73,6 @@ func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Durat
 		PollInterval:     pollInterval,
 		ReportInterval:   reportInterval,
 		Key:              key,
+		RateLimit:        rateLimit,
 	}
 }

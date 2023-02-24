@@ -3,15 +3,24 @@ package agent
 import (
 	"bytes"
 	"compress/gzip"
+	"context"
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
+	"golang.org/x/sync/errgroup"
 )
+
+type metricWorker struct {
+	ch chan Metrics
+	a  *Agent
+	mu sync.Mutex
+}
 
 func Compress(data []byte) ([]byte, error) {
 	var b bytes.Buffer
@@ -37,135 +46,126 @@ func hash(src, key string) string {
 	return fmt.Sprintf("%x", dst)
 }
 
-func (a *Agent) SendGauge(metric Gauge) error {
-	url := a.UpdateAddress
-	m := Metrics{
-		ID:    metric.metricName,
-		MType: "gauge",
-		Value: &metric.metricValue,
+func (w *metricWorker) SendMetric() error {
+	for metric := range w.ch {
+		w.mu.Lock()
+		defer w.mu.Unlock()
+		url := w.a.UpdateAddress
+		if w.a.Key != "" {
+			if metric.MType == "gauge" {
+				metric.Hash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), w.a.Key)
+			} else {
+				metric.Hash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), w.a.Key)
+			}
+		}
+		byteJSON, err := json.Marshal(metric)
+		if err != nil {
+			loggers.ErrorLogger.Println("json Marshal error:", err)
+			return err
+		}
+		compressedJSON, err := Compress(byteJSON)
+		if err != nil {
+			loggers.ErrorLogger.Printf("Compress error: %v", err)
+		}
+		body := strings.NewReader(string(compressedJSON))
+		req, err := http.NewRequest("POST", url, body)
+		if err != nil {
+			loggers.ErrorLogger.Println("Request Creation error:", err)
+			return err
+		}
+		req.Close = true
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Content-Encoding", "gzip")
+		resp, err := w.a.sender.client.Do(req)
+		if err != nil {
+			loggers.ErrorLogger.Println("Client.Do() error:", err)
+			return err
+		}
+		if err := resp.Body.Close(); err != nil {
+			return err
+		}
 	}
-	if a.Key != "" {
-		m.Hash = hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), a.Key)
-	}
-	byteJSON, err := json.Marshal(m)
-	if err != nil {
-		loggers.ErrorLogger.Println("json Marshal error:", err)
-		return err
-	}
-	compressedJSON, err := Compress(byteJSON)
-	if err != nil {
-		loggers.ErrorLogger.Printf("Compress error: %v", err)
-	}
-	body := strings.NewReader(string(compressedJSON))
-	req, err := http.NewRequest("POST", url, body)
-	if err != nil {
-		loggers.ErrorLogger.Println("Request Creation error:", err)
-		return err
-	}
-	req.Close = true
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-	resp, err := a.sender.client.Do(req)
-	if err != nil {
-		loggers.ErrorLogger.Println("Client.Do() error:", err)
-		return err
-	}
-	return resp.Body.Close()
+	return nil
 }
 
-func (a *Agent) SendCounter(metric Counter) error {
-	url := a.UpdateAddress
-	m := Metrics{
-		ID:    metric.metricName,
-		MType: "counter",
-		Delta: &metric.metricValue,
+func (w *metricWorker) ReadMetrics(ctx context.Context) {
+	newMetrics := w.a.collector.CollectRandomValueMetric()
+	metrics := w.a.collector.RuntimeMetrics
+	metrics = append(metrics, newMetrics)
+	metrics = append(metrics, w.a.UtilData.CPUutilizations...)
+	metrics = append(metrics, w.a.UtilData.TotalMemory, w.a.UtilData.FreeMemory)
+	w.a.collector.RuntimeMetrics = append(w.a.collector.RuntimeMetrics, newMetrics, w.a.collector.PollCount)
+	for _, metric := range w.a.collector.RuntimeMetrics {
+		select {
+		case <-ctx.Done():
+			return
+		case w.ch <- metric:
+		}
+
 	}
-	if a.Key != "" {
-		m.Hash = hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), a.Key)
-	}
-	byteJSON, err := json.Marshal(m)
-	if err != nil {
-		loggers.ErrorLogger.Println("json Marshal error:", err)
-		return err
-	}
-	compressedJSON, err := Compress(byteJSON)
-	if err != nil {
-		loggers.ErrorLogger.Printf("Compress error: %v", err)
-	}
-	body := strings.NewReader(string(compressedJSON))
-	req, err := http.NewRequest("POST", url, body)
-	if err != nil {
-		loggers.ErrorLogger.Println("Request Creation error")
-		return err
-	}
-	req.Close = true
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Content-Encoding", "gzip")
-	resp, err := a.sender.client.Do(req)
-	if err != nil {
-		loggers.ErrorLogger.Println("Client.Do() error:", err)
-		return err
-	}
-	return resp.Body.Close()
 }
 
 func (a *Agent) SendAllMetrics() {
-	newMetrics := a.collector.CollectRandomValueMetric()
-	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
-	for _, metric := range a.collector.GaugeMetrics {
-		err := a.SendGauge(metric)
-		if err != nil {
-			loggers.ErrorLogger.Println("can't send Gauge " + err.Error())
-			return
-		}
+	ctx := context.Background()
+	g, _ := errgroup.WithContext(ctx)
+	recordCh := make(chan Metrics)
+	for i := 0; i < a.RateLimit; i++ {
+		w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+		g.Go(w.SendMetric)
 	}
-	loggers.InfoLogger.Println("Sent Gauge")
-	metricCounter := Counter{metricName: "PollCount", metricValue: a.collector.PollCount}
-	a.collector.PollCount = 0
-	err := a.SendCounter(metricCounter)
+	readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+	readW.ReadMetrics(ctx)
+	close(recordCh)
+	err := g.Wait()
 	if err != nil {
-		loggers.ErrorLogger.Println("can't send Counter " + err.Error())
-		return
+		loggers.ErrorLogger.Println("error sending metrics:", err)
 	}
-	loggers.InfoLogger.Println("Sent Counter")
+	*(a.collector.PollCount.Delta) = 0
+	loggers.InfoLogger.Println("Sent Gauge")
 }
 
 func (a *Agent) SendAllMetricsAsButch() {
+	var metricHash string
 	url := a.UpdateAllAddress
 	newMetrics := a.collector.CollectRandomValueMetric()
-	a.collector.GaugeMetrics = append(a.collector.GaugeMetrics, newMetrics)
+	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, newMetrics)
+	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, a.collector.PollCount)
 	var metrics []Metrics
-	for _, metric := range a.collector.GaugeMetrics {
-		var metricHash string
+	for _, metric := range a.collector.RuntimeMetrics {
 		if a.Key != "" {
-			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.metricName, metric.metricValue), a.Key)
+			if metric.MType == "gauge" {
+				metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+			} else {
+				metricHash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), a.Key)
+			}
+			metric.Hash = metricHash
 		}
-		var value = metric.metricValue
-		metrics = append(metrics, Metrics{
-			ID:    metric.metricName,
-			MType: "gauge",
-			Value: &value,
-			Hash:  metricHash,
-		})
-		loggers.DebugLogger.Println(metrics, metric.metricName, metric.metricValue)
+		metrics = append(metrics, metric)
 	}
-	loggers.InfoLogger.Println("Sent Gauge")
-	var metricHash string
+	for _, metric := range a.UtilData.CPUutilizations {
+		if a.Key != "" {
+			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+			metric.Hash = metricHash
+		}
+		metrics = append(metrics, metric)
+	}
+	metric := a.UtilData.TotalMemory
 	if a.Key != "" {
-		metricHash = hash(fmt.Sprintf("%s:counter:%d", "PollCount", a.collector.PollCount), a.Key)
+		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+		metric.Hash = metricHash
 	}
-	var delta = a.collector.PollCount
-	metrics = append(metrics, Metrics{
-		ID:    "PollCount",
-		MType: "counter",
-		Delta: &delta,
-		Hash:  metricHash,
-	})
-	a.collector.PollCount = 0
+	metrics = append(metrics, metric)
+	metric = a.UtilData.FreeMemory
+	if a.Key != "" {
+		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+		metric.Hash = metricHash
+	}
+	metrics = append(metrics, metric)
+
+	loggers.InfoLogger.Println("Sent Metrics")
 	jsonMetrics, err := json.Marshal(metrics)
-	loggers.DebugLogger.Println(string(jsonMetrics))
 	if err != nil {
-		loggers.ErrorLogger.Println("can't send Counter " + err.Error())
+		loggers.ErrorLogger.Println("cannot marshal metrics: " + err.Error())
 		return
 	}
 	compressedJSON, err := Compress(jsonMetrics)
@@ -186,9 +186,9 @@ func (a *Agent) SendAllMetricsAsButch() {
 		loggers.ErrorLogger.Println("Client.Do() error:", err)
 		return
 	}
-	loggers.InfoLogger.Println("Sent Counter")
 	err = resp.Body.Close()
 	if err != nil {
 		loggers.ErrorLogger.Println("response body close error:", err)
 	}
+	*(a.collector.PollCount.Delta) = 0
 }
