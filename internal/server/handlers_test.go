@@ -2,10 +2,12 @@ package server
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +26,7 @@ func TestGetMetricHandler(t *testing.T) {
 	}{
 		{
 			name:   "200 Success update gauge number with dot",
-			URL:    "/update/gauge/Alloc/200.12",
+			URL:    "/update/gauge/Alloc/200.10",
 			method: http.MethodPost,
 			want:   want{code: 200},
 		},
@@ -90,11 +92,14 @@ func TestGetMetricHandler(t *testing.T) {
 				body: []string{"There is no metric you requested\n"}},
 		},
 	}
-	server := httptest.NewServer(Router())
+	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false)
+	handler := DecompressHandler(s.Router())
+	handler = CompressHandler(handler)
+	server := httptest.NewServer(handler)
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resp, body := RunRequest(t, server, tt.method, tt.URL, "")
+			resp, body := RunRequest(t, server, tt.method, tt.URL, "", "text/plain")
 			defer resp.Body.Close()
 			assert.Equal(t, tt.want.code, resp.StatusCode)
 			for _, s := range tt.want.body {
@@ -105,18 +110,146 @@ func TestGetMetricHandler(t *testing.T) {
 	}
 }
 
-func RunRequest(t *testing.T, ts *httptest.Server, method string, query string, body string) (*http.Response, string) {
+func TestJSONHandlers(t *testing.T) {
+	type want struct {
+		code int
+		body []string
+	}
+	tests := []struct {
+		name   string
+		URL    string
+		method string
+		body   string
+		want   want
+	}{
+		{
+			name:   "200 Success JSON update gauge number with dot",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"Alloc","type":"gauge","value":200.10}`,
+			want: want{code: 200,
+				body: []string{`{"id":"Alloc","type":"gauge","value":200.1}`}},
+		},
+		{
+			name:   "200 Success JSON update gauge number without dot",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"Alloc","type":"gauge","value":200}`,
+			want: want{code: 200,
+				body: []string{`{"id":"Alloc","type":"gauge","value":200}`}},
+		},
+		{
+			name:   "200 Success JSON update counter",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount","type":"counter","delta":5}`,
+			want: want{code: 200,
+				body: []string{`{"id":"PollCount","type":"counter","delta":5}`}},
+		},
+		{
+			name:   "200 Success JSON Get counter",
+			URL:    "/value/",
+			method: http.MethodPost,
+			body:   `{"id":"PollCount","type":"counter"}`,
+			want: want{code: 200,
+				body: []string{`{"id":"PollCount","type":"counter","delta":5}`},
+			},
+		},
+		{
+			name:   "200 Success JSON get gauge",
+			URL:    "/value/",
+			method: http.MethodPost,
+			body:   `{"id":"Alloc","type":"gauge"}`,
+			want: want{
+				code: 200,
+				body: []string{`{"id":"Alloc","type":"gauge","value":200}`},
+			},
+		},
+		{
+			name:   "400 JSON update gauge parse error",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"stringMetric","type":"gauge","value":"aaa"}`,
+			want:   want{code: 400},
+		},
+		{
+			name:   "400 JSON update counter parse error",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"PollCounter","type":"counter","delta":11.12}`,
+			want:   want{code: 400},
+		},
+		{
+			name:   "501 JSON post: no metric value in request",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"name","type":"gauge"}`,
+			want: want{code: 501,
+				body: []string{"not implemented: no value in update request\n"}},
+		},
+		{
+			name:   "501 JSON post: wrong metric value type in request",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"name","type":"gauge","delta":200}`,
+			want: want{code: 501,
+				body: []string{"not implemented: no value in update request\n"}},
+		},
+		{
+			name:   "501 JSON post: wrong metric type",
+			URL:    "/update/",
+			method: http.MethodPost,
+			body:   `{"id":"name","type":"wrongType","value":123}`,
+			want: want{code: 501,
+				body: []string{"not implemented: no such type of metric\n"}},
+		},
+		{
+			name:   "404 JSON get no such gauge",
+			URL:    "/value/",
+			method: http.MethodPost,
+			body:   `{"id":"wrongGauge2121331","type":"gauge"}`,
+			want: want{code: 404,
+				body: []string{"There is no metric you requested\n"}},
+		},
+		{
+			name:   "404 JSON get no such counter",
+			URL:    "/value/",
+			method: http.MethodPost,
+			body:   `{"id":"asdasda","type":"counter"}`,
+			want: want{code: 404,
+				body: []string{"There is no metric you requested\n"}},
+		},
+	}
+	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false)
+	handler := DecompressHandler(s.Router())
+	handler = CompressHandler(handler)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			log.Println(s.storage)
+			resp, body := RunRequest(t, server, tt.method, tt.URL, tt.body, "application/json")
+			defer resp.Body.Close()
+			assert.Equal(t, tt.want.code, resp.StatusCode)
+			for _, s := range tt.want.body {
+				assert.Equal(t, body, s)
+			}
+			assert.Equal(t, tt.want.code, resp.StatusCode)
+		})
+	}
+}
+
+func RunRequest(t *testing.T, ts *httptest.Server, method string, query string, body string, contentType string) (*http.Response, string) {
 	reader := strings.NewReader(body)
 	req, err := http.NewRequest(method, ts.URL+query, reader)
-	req.Header.Add("Content-Type", "text/plain")
+	req.Header.Add("Content-Type", contentType)
 
 	require.NoError(t, err)
 
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 
-	respBody, err := io.ReadAll(resp.Body)
+	RespBody, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-
-	return resp, string(respBody)
+	return resp, string(RespBody)
 }

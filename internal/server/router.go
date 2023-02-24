@@ -4,16 +4,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Router() chi.Router {
-	h := Handler{
-		storage: MemStorage{
-			CounterMetrics: make(map[string]int64),
-			GaugeMetrics:   make(map[string]float64),
-		},
-	}
+func (s *Server) Router() chi.Router {
 	router := chi.NewRouter()
-	router.Get("/", h.GetAllMetricsHandler)
-	router.Get("/value/{type}/{name}", h.GetMetricHandler)
-	router.Post("/update/{type}/{name}/{value}", h.PostMetricHandler)
+	router.Get("/", s.GetAllMetricsHandler)
+	router.Get("/value/{type}/{name}", s.GetMetricHandler)
+	router.Post("/update/{type}/{name}/{value}", s.PostMetricHandler)
+	router.Post("/update/", s.PostMetricJSONHandler)
+	router.Post("/value/", s.GetMetricPostJSONHandler)
 	return router
 }
