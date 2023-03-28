@@ -125,7 +125,6 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	for _, m := range metrics {
 		switch m.MType {
 		case "counter":
-			loggers.DebugLogger.Printf("%s: %d", m.ID, *m.Delta)
 			_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", m.ID, *m.Delta)))
 			if err != nil {
 				http.Error(rw, fmt.Sprintf("error while writing response body: %v", err), http.StatusInternalServerError)
@@ -133,7 +132,6 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 				return
 			}
 		case "gauge":
-			loggers.DebugLogger.Printf("%s: %f", m.ID, *m.Value)
 			_, err := rw.Write([]byte(fmt.Sprintf("%s: %f", m.ID, *m.Value)))
 			if err != nil {
 				http.Error(rw, fmt.Sprintf("error while writing response body: %v", err), http.StatusInternalServerError)

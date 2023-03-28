@@ -171,17 +171,12 @@ func (db Database) SaveMetric(m types.Metrics, key string) error {
 				return fmt.Errorf("%wwrong hash in request", myerrors.ErrTypeBadRequest)
 			}
 		}
-		var numberOfMetrics int
-		err := db.CountIDsInDatabaseStmt.QueryRow(m.ID).Scan(&numberOfMetrics)
-		if err != nil {
+		var delta int64
+		err := db.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		if numberOfMetrics != 0 {
-			var delta int64
-			err = db.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
-			if err != nil {
-				return err
-			}
+		if errors.Is(err, sql.ErrNoRows) {
 			_, err = db.UpdateCounterToDatabaseStmt.Exec(m.ID, delta+*m.Delta)
 			if err != nil {
 				return err
