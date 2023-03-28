@@ -100,7 +100,9 @@ func StartServer() {
 			db = nil
 		} else {
 			err = database.SetDatabase(db, dbAddress)
-			loggers.ErrorLogger.Println("error while setting database:", err)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while setting database:", err)
+			}
 		}
 		defer db.Close()
 	} else {

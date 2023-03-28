@@ -47,9 +47,9 @@ func hash(src, key string) string {
 }
 
 func (w *metricWorker) SendMetric() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	for metric := range w.ch {
-		w.mu.Lock()
-		defer w.mu.Unlock()
 		url := w.a.UpdateAddress
 		if w.a.Key != "" {
 			if metric.MType == "gauge" {
@@ -94,7 +94,7 @@ func (w *metricWorker) ReadMetrics(ctx context.Context) {
 	metrics = append(metrics, newMetrics)
 	metrics = append(metrics, w.a.UtilData.CPUutilizations...)
 	metrics = append(metrics, w.a.UtilData.TotalMemory, w.a.UtilData.FreeMemory)
-	w.a.collector.RuntimeMetrics = append(w.a.collector.RuntimeMetrics, newMetrics, w.a.collector.PollCount)
+	w.a.collector.RuntimeMetrics = append(metrics, newMetrics, w.a.collector.PollCount)
 	for _, metric := range w.a.collector.RuntimeMetrics {
 		select {
 		case <-ctx.Done():
