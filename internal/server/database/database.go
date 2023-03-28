@@ -101,13 +101,23 @@ func SetDatabase(db *sql.DB, dbAddress string) error {
 
 func (db Database) GetAllMetrics() ([]types.Metrics, error) {
 	var metrics []types.Metrics
-	rows, err := db.DB.Query("SELECT metrics.id, type, value, delta FROM metrics")
+	rows, err := db.DB.Query("SELECT id, type, value, delta FROM metrics")
 	if err != nil {
 		return nil, fmt.Errorf("error while getting metric from database: %w", err)
 	}
 	for rows.Next() {
-		var m types.Metrics
-		rows.Scan(&m.ID, &m.MType, m.Delta, m.Value)
+		var (
+			m     types.Metrics
+			value sql.NullFloat64
+			delta sql.NullInt64
+		)
+
+		rows.Scan(&m.ID, &m.MType, &value, delta)
+		if value.Valid {
+			m.Value = &value.Float64
+		} else {
+			m.Delta = &delta.Int64
+		}
 		metrics = append(metrics, m)
 	}
 	if rows.Err() != nil {
@@ -171,12 +181,17 @@ func (db Database) SaveMetric(m types.Metrics, key string) error {
 				return fmt.Errorf("%wwrong hash in request", myerrors.ErrTypeBadRequest)
 			}
 		}
-		var delta int64
-		err := db.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		var numberOfMetrics int
+		err := db.CountIDsInDatabaseStmt.QueryRow(m.ID).Scan(&numberOfMetrics)
+		if err != nil {
 			return err
 		}
-		if errors.Is(err, sql.ErrNoRows) {
+		if numberOfMetrics != 0 {
+			var delta int64
+			err = db.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
+			if err != nil {
+				return err
+			}
 			_, err = db.UpdateCounterToDatabaseStmt.Exec(m.ID, delta+*m.Delta)
 			if err != nil {
 				return err
