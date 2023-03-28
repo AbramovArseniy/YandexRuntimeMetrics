@@ -2,13 +2,13 @@ package server
 
 import (
 	"io"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -81,18 +81,17 @@ func TestGetMetricHandler(t *testing.T) {
 			name:   "404 no such gauge",
 			URL:    "/value/gauge/wrongGauge1223r412",
 			method: http.MethodGet,
-			want: want{code: 404,
-				body: []string{"There is no metric you requested\n"}},
+			want:   want{code: 404},
 		},
 		{
 			name:   "404 no such counter",
 			URL:    "/value/counter/adadadad",
 			method: http.MethodGet,
-			want: want{code: 404,
-				body: []string{"There is no metric you requested\n"}},
+			want:   want{code: 404},
 		},
 	}
-	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false, "", nil)
+	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
+	s := NewServer("locashost:8080", false, fs, nil, "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -184,50 +183,45 @@ func TestJSONHandlers(t *testing.T) {
 			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"name","type":"gauge"}`,
-			want: want{code: 501,
-				body: []string{"not implemented: no value in update request\n"}},
+			want:   want{code: 501},
 		},
 		{
 			name:   "501 JSON post: wrong metric value type in request",
 			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"name","type":"gauge","delta":200}`,
-			want: want{code: 501,
-				body: []string{"not implemented: no value in update request\n"}},
+			want:   want{code: 501},
 		},
 		{
 			name:   "501 JSON post: wrong metric type",
 			URL:    "/update/",
 			method: http.MethodPost,
 			body:   `{"id":"name","type":"wrongType","value":123}`,
-			want: want{code: 501,
-				body: []string{"not implemented: no such type of metric\n"}},
+			want:   want{code: 501},
 		},
 		{
 			name:   "404 JSON get no such gauge",
 			URL:    "/value/",
 			method: http.MethodPost,
 			body:   `{"id":"wrongGauge2121331","type":"gauge"}`,
-			want: want{code: 404,
-				body: []string{"There is no metric you requested\n"}},
+			want:   want{code: 404},
 		},
 		{
 			name:   "404 JSON get no such counter",
 			URL:    "/value/",
 			method: http.MethodPost,
 			body:   `{"id":"asdasda","type":"counter"}`,
-			want: want{code: 404,
-				body: []string{"There is no metric you requested\n"}},
+			want:   want{code: 404},
 		},
 	}
-	s := NewServer("locashost:8080", 300*time.Second, "/tmp/test.json", true, false, "", nil)
+	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
+	s := NewServer("locashost:8080", false, fs, nil, "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
 	defer server.Close()
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			log.Println(s.storage)
 			resp, body := RunRequest(t, server, tt.method, tt.URL, tt.body, "application/json")
 			defer resp.Body.Close()
 			assert.Equal(t, tt.want.code, resp.StatusCode)

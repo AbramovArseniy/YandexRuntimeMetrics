@@ -27,6 +27,7 @@ RUN go build -race -v -o ./bin/agent ./cmd/agent/...
 FROM alpine:$ALPINE_IMAGE_TAG as server
 WORKDIR /app
 COPY --from=server-build /app/bin/server .
+COPY migrations .
 EXPOSE 8080
 ENV ADDRESS="127.0.0.1:8080"
 ENV STORE_INTERVAL="300s"

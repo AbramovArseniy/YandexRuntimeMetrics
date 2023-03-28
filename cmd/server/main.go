@@ -2,22 +2,18 @@ package main
 
 import (
 	"database/sql"
-	"errors"
 	"flag"
-	"fmt"
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
+	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
@@ -92,31 +88,10 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	return address, storeInterval, storeFile, restore, flagDebug, key, database
 }
 
-func setDatabase(db *sql.DB) error {
-	driver, err := postgres.WithInstance(db, &postgres.Config{})
-	if err != nil {
-		return fmt.Errorf("could not create driver: %w", err)
-	}
-	m, err := migrate.NewWithDatabaseInstance(
-		"file://./migrations",
-		"postgres", driver)
-	if err != nil {
-		return fmt.Errorf("could not create migration: %w", err)
-	}
-
-	if err != nil {
-		loggers.ErrorLogger.Println("error while creating table:", err)
-		return err
-	}
-	if err = m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return err
-	}
-	return nil
-}
-
 func StartServer() {
 	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
 	var db *sql.DB
+	var fs filestorage.FileStorage
 	var err error
 	if dbAddress != "" {
 		db, err = sql.Open("pgx", dbAddress)
@@ -124,30 +99,25 @@ func StartServer() {
 			loggers.ErrorLogger.Println("opening DB error:", err)
 			db = nil
 		} else {
-			setDatabase(db)
+			err = database.SetDatabase(db, dbAddress)
+			loggers.ErrorLogger.Println("error while setting database:", err)
 		}
 		defer db.Close()
 	} else {
 		db = nil
 	}
-	s := server.NewServer(address, storeInterval, storeFile, restore, debug, key, db)
+	if db == nil {
+		fs = filestorage.NewFileStorage(storeFile, storeInterval, restore)
+		fs.SetFileStorage()
+	}
+	s := server.NewServer(address, debug, fs, db, key)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
 	srv := &http.Server{
 		Addr:    s.Addr,
 		Handler: handler,
 	}
-	if db == nil {
-		if strings.LastIndex(s.FileHandler.StoreFile, "/") != -1 {
-			if err := os.MkdirAll(s.FileHandler.StoreFile[:strings.LastIndex(s.FileHandler.StoreFile, "/")], 0777); err != nil {
-				loggers.ErrorLogger.Println("failed to create directory:", err)
-			}
-		}
-		if s.FileHandler.Restore {
-			s.RestoreMetricsFromFile()
-		}
-		go repeating.Repeat(s.StoreMetricsToFile, s.FileHandler.StoreInterval)
-	}
+
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
 	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
