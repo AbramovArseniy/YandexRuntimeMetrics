@@ -52,9 +52,11 @@ func BenchmarkTextPlainMetricHandler(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				if v.Method == http.MethodPost {
 					rdr := strings.NewReader("")
-					http.DefaultClient.Post(v.URL, "text/plain", rdr)
+					resp, _ := http.DefaultClient.Post(v.URL, "text/plain", rdr)
+					resp.Body.Close()
 				} else {
-					http.DefaultClient.Get(v.URL)
+					resp, _ := http.DefaultClient.Get(v.URL)
+					resp.Body.Close()
 				}
 			}
 		})
@@ -112,7 +114,8 @@ func BenchmarkJSONMetricHandler(b *testing.B) {
 		b.Run(v.Name, func(b *testing.B) {
 			for i := 0; i < b.N; i++ {
 				rdr := strings.NewReader("")
-				http.DefaultClient.Post(v.URL, "text/plain", rdr)
+				resp, _ := http.DefaultClient.Post(v.URL, "text/plain", rdr)
+				resp.Body.Close()
 			}
 		})
 	}
