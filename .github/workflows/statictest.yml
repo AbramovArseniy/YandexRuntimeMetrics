@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - new_struct
+      - iter15
 jobs:
 
   statictest:
