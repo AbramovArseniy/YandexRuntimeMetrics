@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"flag"
 	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"strconv"
 	"time"
@@ -22,15 +23,6 @@ const (
 	defaultStoreInterval = 300 * time.Second
 	defaultStoreFile     = "/tmp/devops-metrics-db.json"
 	defaultRestore       = true
-	createTableQuerySQL  = `
-				CREATE TABLE IF NOT EXISTS metrics (
-					id VARCHAR(128) PRIMARY KEY,
-					type VARCHAR(32) NOT NULL,
-					value DOUBLE PRECISION,
-					delta BIGINT
-				);
-				CREATE UNIQUE INDEX IF NOT EXISTS idx_metrics_id_type ON metrics (id, type);
-		`
 )
 
 func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
@@ -121,7 +113,7 @@ func StartServer() {
 	}
 
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
-	err = srv.ListenAndServe()
+	err = http.ListenAndServe(srv.Addr, srv.Handler)
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)
 	}

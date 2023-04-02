@@ -1,7 +1,7 @@
 package types
 
 import (
-	"io"
+	"compress/gzip"
 	"net/http"
 )
 
@@ -15,7 +15,7 @@ type Metrics struct {
 
 type GZIPWriter struct {
 	http.ResponseWriter
-	Writer io.Writer
+	Writer *gzip.Writer
 }
 
 func (w GZIPWriter) Write(b []byte) (int, error) {

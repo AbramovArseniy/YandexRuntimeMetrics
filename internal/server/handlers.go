@@ -3,6 +3,7 @@ package server
 import (
 	"compress/gzip"
 	"database/sql"
+	_ "net/http/pprof"
 
 	//"database/sql"
 	"encoding/json"

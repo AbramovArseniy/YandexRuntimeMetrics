@@ -4,6 +4,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	_ "net/http/pprof"
 	"strings"
 	"testing"
 	"time"
@@ -12,6 +13,110 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func BenchmarkTextPlainMetricHandler(b *testing.B) {
+	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
+	s := NewServer("locashost:8080", false, fs, nil, "")
+	handler := DecompressHandler(s.Router())
+	handler = CompressHandler(handler)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	requests := []struct {
+		Name   string
+		URL    string
+		Method string
+	}{
+		{
+			Name:   "Post gauge",
+			URL:    "/update/gauge/Alloc/200.10",
+			Method: http.MethodPost,
+		},
+		{
+			Name:   "Post counter",
+			URL:    "/update/counter/PollCount/5",
+			Method: http.MethodPost,
+		},
+		{
+			Name:   "Get counter",
+			URL:    "/value/counter/PollCount",
+			Method: http.MethodGet,
+		},
+		{
+			Name:   "Get gauge",
+			URL:    "/value/gauge/Alloc",
+			Method: http.MethodGet,
+		},
+	}
+	for _, v := range requests {
+		b.Run(v.Name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				if v.Method == http.MethodPost {
+					rdr := strings.NewReader("")
+					http.DefaultClient.Post(v.URL, "text/plain", rdr)
+				} else {
+					http.DefaultClient.Get(v.URL)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkJSONMetricHandler(b *testing.B) {
+	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
+	s := NewServer("locashost:8080", false, fs, nil, "")
+	handler := DecompressHandler(s.Router())
+	handler = CompressHandler(handler)
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	requests := []struct {
+		Name string
+		URL  string
+		Body []string
+	}{
+		{
+			Name: "Post gauge",
+			URL:  "/update/",
+			Body: []string{`{
+				"id":"Alloc",
+				"type":"gauge",
+				"value":400
+			}`},
+		},
+		{
+			Name: "Post counter",
+			URL:  "/update/counter/PollCount/5",
+			Body: []string{`{
+				"id":"Counter",
+				"type":"counter",
+				"value":100
+			}`},
+		},
+		{
+			Name: "Get counter",
+			URL:  "/value/counter/PollCount",
+			Body: []string{`{
+				"id":"Counter",
+				"type":"counter"
+			}`},
+		},
+		{
+			Name: "Get gauge",
+			URL:  "/value/gauge/Alloc",
+			Body: []string{`{
+				"id":"Alloc",
+				"type":"gauge",
+			}`},
+		},
+	}
+	for _, v := range requests {
+		b.Run(v.Name, func(b *testing.B) {
+			for i := 0; i < b.N; i++ {
+				rdr := strings.NewReader("")
+				http.DefaultClient.Post(v.URL, "text/plain", rdr)
+			}
+		})
+	}
+}
 
 func TestGetMetricHandler(t *testing.T) {
 	type want struct {
