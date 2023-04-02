@@ -11,11 +11,12 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
 	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 const (

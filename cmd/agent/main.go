@@ -9,9 +9,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shirou/gopsutil/cpu"
+
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
-	"github.com/shirou/gopsutil/cpu"
 )
 
 const (

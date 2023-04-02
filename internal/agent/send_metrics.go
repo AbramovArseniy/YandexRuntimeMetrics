@@ -12,8 +12,9 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
 type metricWorker struct {

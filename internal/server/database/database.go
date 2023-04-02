@@ -8,13 +8,14 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/hash"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
-	"github.com/golang-migrate/migrate/v4"
-	"github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 )
 
 type Database struct {

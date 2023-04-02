@@ -7,9 +7,10 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
 func (a *Agent) CollectRuntimeMetrics() {

@@ -9,9 +9,10 @@ import (
 	"testing"
 	"time"
 
-	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 )
 
 func BenchmarkTextPlainMetricHandler(b *testing.B) {
