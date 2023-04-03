@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// Router routes handlers to urls
 func (s *Server) Router() chi.Router {
 	router := chi.NewRouter()
 	router.Get("/", s.GetAllMetricsHandler)

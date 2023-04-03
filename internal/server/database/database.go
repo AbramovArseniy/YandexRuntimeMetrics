@@ -1,3 +1,4 @@
+// Module database works with server's database
 package database
 
 import (
@@ -18,8 +19,11 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
 )
 
+// Database sends requests to database
 type Database struct {
-	DB                               *sql.DB
+	// sql.DB pointer
+	DB *sql.DB
+	// database request statement
 	InsertCounterToDatabaseStmt      *sql.Stmt
 	UpdateCounterToDatabaseStmt      *sql.Stmt
 	InsertUpdateGaugeToDatabaseStmt  *sql.Stmt
@@ -29,6 +33,7 @@ type Database struct {
 	CountIDsInDatabaseStmt           *sql.Stmt
 }
 
+// NewDatabase creates new Database
 func NewDatabase(db *sql.DB) Database {
 	var insertCounterStmt, updateCounterStmt, countIDsStmt, insertGaugeStmt, selectAllStmt, selectOneGaugeStmt, selectOneCounterStmt *sql.Stmt = nil, nil, nil, nil, nil, nil, nil
 	if db != nil {
@@ -83,6 +88,7 @@ func NewDatabase(db *sql.DB) Database {
 	}
 }
 
+// SetDatabase sets database preferences
 func SetDatabase(db *sql.DB, dbAddress string) error {
 	driver, err := postgres.WithInstance(db, &postgres.Config{})
 	if err != nil {
@@ -100,6 +106,7 @@ func SetDatabase(db *sql.DB, dbAddress string) error {
 	return nil
 }
 
+// GetAllMetrics gets info about all metrics from database
 func (db Database) GetAllMetrics() ([]types.Metrics, error) {
 	var metrics []types.Metrics
 	rows, err := db.DB.Query("SELECT id, type, value, delta FROM metrics")
@@ -127,6 +134,7 @@ func (db Database) GetAllMetrics() ([]types.Metrics, error) {
 	return metrics, nil
 }
 
+// GetMetric gets info about one metric from database
 func (db Database) GetMetric(m types.Metrics, key string) (types.Metrics, error) {
 	switch m.MType {
 	case "gauge":
@@ -158,6 +166,7 @@ func (db Database) GetMetric(m types.Metrics, key string) (types.Metrics, error)
 	return m, nil
 }
 
+// SaveMetric saves info about one metric into database
 func (db Database) SaveMetric(m types.Metrics, key string) error {
 	switch m.MType {
 	case "gauge":
@@ -209,10 +218,12 @@ func (db Database) SaveMetric(m types.Metrics, key string) error {
 	return nil
 }
 
+// Check checks if database works OK
 func (db Database) Check() error {
 	return db.DB.Ping()
 }
 
+// SaveManyMetrics saves several metrics into database
 func (db Database) SaveManyMetrics(metrics []types.Metrics, key string) error {
 	for _, m := range metrics {
 		err := db.SaveMetric(m, key)

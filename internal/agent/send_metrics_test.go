@@ -12,6 +12,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+// Default test preferences
 const (
 	tcp            = "tcp"
 	defaultTimeout = 2 * time.Second

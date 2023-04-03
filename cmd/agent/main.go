@@ -1,3 +1,4 @@
+// Module main starts agent
 package main
 
 import (
@@ -15,6 +16,7 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 )
 
+// default agent preferences
 const (
 	defaultPollInterval   = 2 * time.Second
 	defaultReportInterval = 10 * time.Second
@@ -22,6 +24,7 @@ const (
 	defaultRateLimit      = 100
 )
 
+// setAgentParams set agent config
 func setAgentParams() (string, time.Duration, time.Duration, string, int) {
 	var (
 		flagPollInterval   time.Duration
@@ -76,6 +79,7 @@ func setAgentParams() (string, time.Duration, time.Duration, string, int) {
 	return address, pollInterval, reportInterval, key, rateLimit
 }
 
+// main starts agent
 func main() {
 	a := agent.NewAgent(setAgentParams())
 	cpuStat, err := cpu.Times(true)

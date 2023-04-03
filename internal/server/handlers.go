@@ -27,6 +27,7 @@ import (
 
 const contentTypeJSON = "application/json"
 
+// Server has server info
 type Server struct {
 	Addr        string
 	Debug       bool
@@ -35,6 +36,7 @@ type Server struct {
 	StorageType types.StorageType
 }
 
+// NewServer creates new Server
 func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.DB, key string) *Server {
 	var (
 		storage     storage.Storage
@@ -56,6 +58,7 @@ func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.D
 	}
 }
 
+// CompressHandler is a middleware that compresses data to gzip if gzip encoding is accepted
 func CompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -74,6 +77,7 @@ func CompressHandler(next http.Handler) http.Handler {
 	})
 }
 
+// CompressHandler is a middleware that decompresses data from gzip
 func DecompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
@@ -93,6 +97,7 @@ func DecompressHandler(next http.Handler) http.Handler {
 
 }
 
+// GetGaugeStatusOK describes response in case of successful getting of gauge metric value from storage
 func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
@@ -104,6 +109,7 @@ func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 	}
 }
 
+// GetCounterStatusOK describes response in case of successful getting of counter metric value from storage
 func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
@@ -115,6 +121,7 @@ func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 
 }
 
+// GetAllMetricsHandler prints info about all metrics in storage
 func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	loggers.InfoLogger.Println("Get all request")
 	rw.Header().Set("Content-Type", "text/html")
@@ -151,6 +158,7 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+// PostUpdateManyMetricsHandler updates info about several metrics
 func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	var metrics []types.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
@@ -172,6 +180,7 @@ func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Re
 	}
 }
 
+// PostMetricHandler updates info about one metric
 func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	var m types.Metrics
 	metricType, metricName, metricValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
@@ -205,6 +214,7 @@ func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	rw.WriteHeader(http.StatusOK)
 }
 
+// GetMetricHandler prints value of requested metric
 func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	var m = types.Metrics{
 		ID:    chi.URLParam(r, "name"),
@@ -242,6 +252,7 @@ func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// PostMetricJSONHandler updates info about one metric, sent a json
 func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
@@ -296,6 +307,7 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 	rw.WriteHeader(http.StatusOK)
 }
 
+// GetMetricPostJSONHandler prints info about metrics requested as json
 func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
@@ -352,6 +364,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 	rw.WriteHeader(http.StatusOK)
 }
 
+// GetPingDBHandler checks if database is connected
 func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
 	if s.StorageType != types.StorageTypeDB {
 		http.Error(rw, "nil database pointer", http.StatusInternalServerError)

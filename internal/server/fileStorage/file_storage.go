@@ -16,11 +16,13 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
 )
 
+// MemStorage stores metric info
 type MemStorage struct {
 	CounterMetrics map[string]int64
 	GaugeMetrics   map[string]float64
 }
 
+// NewMemStorage creates new MemStorage
 func NewMemStorage() *MemStorage {
 	return &MemStorage{
 		CounterMetrics: make(map[string]int64),
@@ -28,13 +30,16 @@ func NewMemStorage() *MemStorage {
 	}
 }
 
+// FileStorage gets metric info from file and save metric info into file
 type FileStorage struct {
+	// StoreInterval is an interval in witch data is stored to file
 	StoreInterval time.Duration
 	StoreFile     string
 	Restore       bool
 	storage       *MemStorage
 }
 
+// NewFileStorage creates new FileStorage
 func NewFileStorage(storeFile string, storeInterval time.Duration, restore bool) FileStorage {
 	return FileStorage{
 		StoreInterval: storeInterval,
@@ -44,6 +49,7 @@ func NewFileStorage(storeFile string, storeInterval time.Duration, restore bool)
 	}
 }
 
+// storeMetricsToFile stores data from MemStorage to file
 func (fs FileStorage) storeMetricsToFile() {
 	file, err := os.OpenFile(fs.StoreFile, os.O_WRONLY|os.O_CREATE, 0777)
 	writer := bufio.NewWriter(file)
@@ -96,6 +102,7 @@ func (fs FileStorage) storeMetricsToFile() {
 	loggers.InfoLogger.Println("stored to file")
 }
 
+// RestoreMetrics restores metric from file to MemStorage
 func (fs FileStorage) RestoreMetrics() error {
 	file, err := os.OpenFile(fs.StoreFile, os.O_RDONLY|os.O_CREATE, 0777)
 	scanner := bufio.NewScanner(file)
@@ -117,6 +124,7 @@ func (fs FileStorage) RestoreMetrics() error {
 	return nil
 }
 
+// SaveMetric saves info about one metric into MemStorage
 func (fs FileStorage) SaveMetric(m types.Metrics, key string) error {
 	switch m.MType {
 	case "gauge":
@@ -145,6 +153,7 @@ func (fs FileStorage) SaveMetric(m types.Metrics, key string) error {
 	return nil
 }
 
+// GetAllMetrics gets info about all metrics from MemStorage
 func (fs FileStorage) GetAllMetrics() ([]types.Metrics, error) {
 	var metrics []types.Metrics
 	for name, value := range fs.storage.CounterMetrics {
@@ -158,6 +167,7 @@ func (fs FileStorage) GetAllMetrics() ([]types.Metrics, error) {
 	return metrics, nil
 }
 
+// SetFileStorage file storage preferences
 func (fs FileStorage) SetFileStorage() {
 	if strings.LastIndex(fs.StoreFile, "/") != -1 {
 		if err := os.MkdirAll(fs.StoreFile[:strings.LastIndex(fs.StoreFile, "/")], 0777); err != nil {
@@ -173,6 +183,7 @@ func (fs FileStorage) SetFileStorage() {
 	go repeating.Repeat(fs.storeMetricsToFile, fs.StoreInterval)
 }
 
+// GetMetric gets info about one metric from MemStorage
 func (fs FileStorage) GetMetric(m types.Metrics, key string) (types.Metrics, error) {
 	switch m.MType {
 	case "counter":
@@ -191,10 +202,12 @@ func (fs FileStorage) GetMetric(m types.Metrics, key string) (types.Metrics, err
 	return m, nil
 }
 
+// Check checks if file storage works OK
 func (fs FileStorage) Check() error {
 	return nil
 }
 
+// SaveManyMetrics saves several metrics into MemStorage
 func (fs FileStorage) SaveManyMetrics(metrics []types.Metrics, key string) error {
 	for _, m := range metrics {
 		err := fs.SaveMetric(m, key)

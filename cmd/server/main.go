@@ -1,3 +1,4 @@
+// Module main starts server
 package main
 
 import (
@@ -19,13 +20,17 @@ import (
 	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 )
 
+// defaultAddress is a default server address
+const defaultAddress = "localhost:8080"
+
+// default file storage config
 const (
-	defaultAddress       = "localhost:8080"
 	defaultStoreInterval = 300 * time.Second
 	defaultStoreFile     = "/tmp/devops-metrics-db.json"
 	defaultRestore       = true
 )
 
+// setServerParams sets server config
 func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
 	var (
 		flagRestore, restore             bool
@@ -81,6 +86,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	return address, storeInterval, storeFile, restore, flagDebug, key, database
 }
 
+// StartServer starts server
 func StartServer() {
 	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
 	var db *sql.DB
