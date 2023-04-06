@@ -7,11 +7,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
+// CollectRuntimeMetrics collects runtime metrics
 func (a *Agent) CollectRuntimeMetrics() {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
@@ -77,6 +79,7 @@ func (a *Agent) CollectRuntimeMetrics() {
 	loggers.InfoLogger.Println("Collected GaugeMetrics")
 }
 
+// CollectRandomValueMetric collects metric with random value
 func (s *metricCollector) CollectRandomValueMetric() Metrics {
 	rand.Seed(time.Now().Unix())
 	value := rand.Float64() * 1000
@@ -85,6 +88,7 @@ func (s *metricCollector) CollectRandomValueMetric() Metrics {
 	return randomValueMetric
 }
 
+// CollectUtilizationMetrics collects cpu and mem metrics
 func (a *Agent) CollectUtilizationMetrics() {
 	m, err := mem.VirtualMemory()
 	if err != nil {

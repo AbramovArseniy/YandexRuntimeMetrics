@@ -2,9 +2,8 @@ package server
 
 import (
 	"compress/gzip"
-	"crypto/hmac"
-	"crypto/sha256"
 	"database/sql"
+	_ "net/http/pprof"
 
 	//"database/sql"
 	"encoding/json"
@@ -15,24 +14,51 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/go-chi/chi/v5"
 	_ "github.com/jackc/pgx/v5/stdlib"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
+	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/storage"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
 )
 
 const contentTypeJSON = "application/json"
 
-var ErrTypeNotImplemented = errors.New("not implemented: ")
-var ErrTypeBadRequest = errors.New("bad request: ")
-var ErrTypeNotFound = errors.New("not found: ")
-
-func hash(src, key string) string {
-	h := hmac.New(sha256.New, []byte(key))
-	h.Write([]byte(src))
-	dst := h.Sum(nil)
-	return fmt.Sprintf("%x", dst)
+// Server has server info
+type Server struct {
+	Addr        string
+	Debug       bool
+	Key         string
+	Storage     storage.Storage
+	StorageType types.StorageType
 }
 
+// NewServer creates new Server
+func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.DB, key string) *Server {
+	var (
+		storage     storage.Storage
+		storageType types.StorageType
+	)
+	if db == nil {
+		storage = fs
+		storageType = types.StorageTypeFile
+	} else {
+		storage = database.NewDatabase(db)
+		storageType = types.StorageTypeDB
+	}
+	return &Server{
+		Addr:        address,
+		Debug:       debug,
+		Key:         key,
+		Storage:     storage,
+		StorageType: storageType,
+	}
+}
+
+// CompressHandler is a middleware that compresses data to gzip if gzip encoding is accepted
 func CompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("Accept-Encoding"), "gzip") {
@@ -47,10 +73,11 @@ func CompressHandler(next http.Handler) http.Handler {
 		defer gz.Close()
 
 		w.Header().Set("Content-Encoding", "gzip")
-		next.ServeHTTP(gzipWriter{ResponseWriter: w, Writer: gz}, r)
+		next.ServeHTTP(types.GZIPWriter{ResponseWriter: w, Writer: gz}, r)
 	})
 }
 
+// CompressHandler is a middleware that decompresses data from gzip
 func DecompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
@@ -70,6 +97,7 @@ func DecompressHandler(next http.Handler) http.Handler {
 
 }
 
+// GetGaugeStatusOK describes response in case of successful getting of gauge metric value from storage
 func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
@@ -81,6 +109,7 @@ func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 	}
 }
 
+// GetCounterStatusOK describes response in case of successful getting of counter metric value from storage
 func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
@@ -92,111 +121,109 @@ func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 
 }
 
+// GetAllMetricsHandler prints info about all metrics in storage
 func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	loggers.InfoLogger.Println("Get all request")
 	rw.Header().Set("Content-Type", "text/html")
-	if s.Database.DB == nil {
-		for metricName, metricVal := range s.storage.GaugeMetrics {
-			strVal := strconv.FormatFloat(metricVal, 'f', -1, 64)
-			_, err := rw.Write([]byte(fmt.Sprintf("%s: %s\n", metricName, strVal)))
+	metrics, err := s.Storage.GetAllMetrics()
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		loggers.ErrorLogger.Println("error while getting all metrics:", err)
+		return
+	}
+	for _, m := range metrics {
+		switch m.MType {
+		case "counter":
+			_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", m.ID, *m.Delta)))
 			if err != nil {
-				loggers.ErrorLogger.Println("response writer error:", err)
+				http.Error(rw, fmt.Sprintf("error while writing response body: %v", err), http.StatusInternalServerError)
+				loggers.ErrorLogger.Println("error while writing response body:", err)
+				return
+			}
+		case "gauge":
+			_, err := rw.Write([]byte(fmt.Sprintf("%s: %f", m.ID, *m.Value)))
+			if err != nil {
+				http.Error(rw, fmt.Sprintf("error while writing response body: %v", err), http.StatusInternalServerError)
+				loggers.ErrorLogger.Println("error while writing response body:", err)
 				return
 			}
 		}
-		for metricName, metricVal := range s.storage.CounterMetrics {
-			_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", metricName, metricVal)))
-			if err != nil {
-				loggers.ErrorLogger.Println("response writer error:", err)
-				return
-			}
-		}
-	} else {
-		rows, err := s.Database.DB.QueryContext(r.Context(), "SELECT metrics.id, type, value, delta FROM metrics")
+		_, err := rw.Write([]byte("\n"))
 		if err != nil {
-			http.Error(rw, fmt.Sprintf("database error: %v", err), http.StatusInternalServerError)
+			http.Error(rw, fmt.Sprintf("error while writing response body: %v", err), http.StatusInternalServerError)
+			loggers.ErrorLogger.Println("error while writing response body:", err)
 			return
-		}
-		for rows.Next() {
-			var (
-				id, mType string
-				delta     sql.NullInt64
-				value     sql.NullFloat64
-			)
-			rows.Scan(&id, &mType, &delta, &value)
-			switch mType {
-			case "counter":
-				_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", id, delta.Int64)))
-				if err != nil {
-					loggers.ErrorLogger.Println("response writer error:", err)
-					return
-				}
-			case "gauge":
-				_, err := rw.Write([]byte(fmt.Sprintf("%s: %f", id, value.Float64)))
-				if err != nil {
-					loggers.ErrorLogger.Println("response writer error:", err)
-					return
-				}
-			}
-			if rows.Err() != nil {
-				http.Error(rw, fmt.Sprintf("database error: %v", rows.Err()), http.StatusInternalServerError)
-				return
-			}
 		}
 	}
 	rw.WriteHeader(http.StatusOK)
 }
 
+// PostUpdateManyMetricsHandler updates info about several metrics
 func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Request) {
-	var metrics []Metrics
+	var metrics []types.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		loggers.ErrorLogger.Println("update many decode error:", err)
 	}
 	if s.Debug {
 		loggers.DebugLogger.Println("POST many metrics request")
 	}
-	err := s.StoreManyMetrics(metrics)
+	err := s.Storage.SaveManyMetrics(metrics, s.Key)
+	if errors.Is(err, myerrors.ErrTypeNotImplemented) {
+		http.Error(rw, err.Error(), http.StatusNotImplemented)
+	}
+	if errors.Is(err, myerrors.ErrTypeBadRequest) {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+	}
 	if err != nil {
 		loggers.ErrorLogger.Println("store many metrics error:", err)
 		return
 	}
 }
 
+// PostMetricHandler updates info about one metric
 func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
+	var m types.Metrics
 	metricType, metricName, metricValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
-	switch metricType {
-	case "gauge":
-		newVal, err := strconv.ParseFloat(metricValue, 64)
+	m.ID = metricName
+	m.MType = metricType
+	if m.MType == "counter" {
+		delta, err := strconv.ParseInt(metricValue, 10, 64)
 		if err != nil {
-			http.Error(rw, fmt.Sprintf("error parsing value %s as float", metricValue), http.StatusBadRequest)
+			http.Error(rw, err.Error(), http.StatusBadRequest)
 		}
-		s.storage.GaugeMetrics[metricName] = newVal
-	case "counter":
-		newVal, err := strconv.ParseInt(metricValue, 10, 64)
-		if err != nil {
-			http.Error(rw, fmt.Sprintf("error parsing value %s as int", metricValue), http.StatusBadRequest)
-		}
-		s.storage.CounterMetrics[metricName] += newVal
-	default:
-		loggers.ErrorLogger.Printf("wrong Metric Type: %s", metricType)
-		http.Error(rw, "Wrong Metric Type", http.StatusNotImplemented)
+		m.Delta = &delta
 	}
-	if s.Debug {
-		loggers.DebugLogger.Printf("POST %s %s", metricType, metricName)
+	if m.MType == "gauge" {
+		value, err := strconv.ParseFloat(metricValue, 64)
+		if err != nil {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+		}
+		m.Value = &value
+	}
+	err := s.Storage.SaveMetric(m, s.Key)
+	if errors.Is(err, myerrors.ErrTypeNotImplemented) {
+		http.Error(rw, err.Error(), http.StatusNotImplemented)
+	}
+	if errors.Is(err, myerrors.ErrTypeBadRequest) {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+	}
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 	}
 	rw.Header().Add("Content-Type", "text/plain")
 	rw.WriteHeader(http.StatusOK)
 }
 
+// GetMetricHandler prints value of requested metric
 func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
-	var m = Metrics{
+	var m = types.Metrics{
 		ID:    chi.URLParam(r, "name"),
 		MType: chi.URLParam(r, "type"),
 	}
 	if s.Debug {
 		loggers.DebugLogger.Printf("GET %s %s", m.MType, m.ID)
 	}
-	if m, err := s.GetMetricValue(rw, r, m); err == nil {
+	if m, err := s.Storage.GetMetric(m, s.Key); err == nil {
 		if s.Debug {
 			loggers.DebugLogger.Println(m.ID, *m.Delta)
 		}
@@ -207,19 +234,25 @@ func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 			}
 			GetCounterStatusOK(rw, *m.Delta)
 		case "gauge":
-
 			GetGaugeStatusOK(rw, *m.Value)
 		}
 	} else {
 		if s.Debug {
 			loggers.DebugLogger.Println("metric not found")
 		}
-		if errors.Is(err, ErrTypeNotFound) {
-			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+		if errors.Is(err, myerrors.ErrTypeNotFound) {
+			http.Error(rw, err.Error(), http.StatusNotFound)
+		}
+		if errors.Is(err, myerrors.ErrTypeBadRequest) {
+			http.Error(rw, err.Error(), http.StatusBadRequest)
+		}
+		if errors.Is(err, myerrors.ErrTypeNotImplemented) {
+			http.Error(rw, err.Error(), http.StatusNotImplemented)
 		}
 	}
 }
 
+// PostMetricJSONHandler updates info about one metric, sent a json
 func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
@@ -231,7 +264,7 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 		loggers.ErrorLogger.Println("Wrong content type:", r.Header.Get("Content-Type"))
 		return
 	}
-	var m Metrics
+	var m types.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		rw.WriteHeader(http.StatusBadRequest)
 		loggers.ErrorLogger.Printf("Decode error: %v", err)
@@ -244,43 +277,37 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 	if s.Debug {
 		loggers.DebugLogger.Println("POST JSON " + m.ID + " " + m.MType)
 	}
-	if s.Database.DB != nil {
-		err := s.storeMetricsToDatabase(m)
-		if err != nil {
-			if errors.Is(err, ErrTypeNotImplemented) {
-				http.Error(rw, err.Error(), http.StatusNotImplemented)
-			}
-			loggers.ErrorLogger.Println("store metrics to db error:", err.Error())
-			return
-		}
-	} else {
-		err := s.storeMetrics(m)
-		if err != nil {
-			if errors.Is(err, ErrTypeNotImplemented) {
-				http.Error(rw, err.Error(), http.StatusNotImplemented)
-			}
-			if errors.Is(err, ErrTypeBadRequest) {
-				http.Error(rw, err.Error(), http.StatusBadRequest)
-			}
-			loggers.ErrorLogger.Println("Store Metrics error:", err.Error())
-			return
-		}
+	err := s.Storage.SaveMetric(m, s.Key)
+	if errors.Is(err, myerrors.ErrTypeNotImplemented) {
+		http.Error(rw, err.Error(), http.StatusNotImplemented)
+		return
 	}
-	rw.Header().Add("Content-Type", contentTypeJSON)
+	if errors.Is(err, myerrors.ErrTypeBadRequest) {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	jsonMetric, err := json.Marshal(m)
 	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		loggers.ErrorLogger.Printf("json Marshal error: %s", err)
 		return
 	}
 	_, err = rw.Write(jsonMetric)
 	if err != nil {
+		http.Error(rw, err.Error(), http.StatusInternalServerError)
 		http.Error(rw, "can't write body", http.StatusInternalServerError)
 		loggers.ErrorLogger.Println(err)
 		return
 	}
+	rw.Header().Add("Content-Type", contentTypeJSON)
 	rw.WriteHeader(http.StatusOK)
 }
 
+// GetMetricPostJSONHandler prints info about metrics requested as json
 func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
@@ -298,7 +325,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		http.Error(rw, "reading body error", http.StatusInternalServerError)
 		return
 	}
-	var m Metrics
+	var m types.Metrics
 	if err = json.Unmarshal(body, &m); err != nil {
 		http.Error(rw, "Could not unmarshal JSON:", http.StatusInternalServerError)
 		return
@@ -306,15 +333,19 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 	if s.Debug {
 		loggers.DebugLogger.Println("Get JSON:", m)
 	}
-	m, err = s.GetMetricValue(rw, r, m)
+	m, err = s.Storage.GetMetric(m, s.Key)
 	if s.Debug {
 		loggers.DebugLogger.Println(m)
 	}
 	if err != nil {
-		if errors.Is(err, ErrTypeNotFound) {
+		if errors.Is(err, myerrors.ErrTypeNotFound) {
 			http.Error(rw, "There is no metric you requested", http.StatusNotFound)
+		} else if errors.Is(err, myerrors.ErrTypeNotImplemented) {
+			http.Error(rw, fmt.Sprintf("wrong type of metric: %v", err), http.StatusNotImplemented)
+		} else if errors.Is(err, myerrors.ErrTypeBadRequest) {
+			http.Error(rw, fmt.Sprintf("bad request: %v", err), http.StatusBadRequest)
 		} else {
-			http.Error(rw, fmt.Sprintf("Err while getting value: %v", err), http.StatusInternalServerError)
+			http.Error(rw, "There is no metric you requested", http.StatusInternalServerError)
 		}
 		return
 	}
@@ -329,195 +360,20 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 		loggers.ErrorLogger.Println(err)
 		return
 	}
-
+	rw.Header().Add("Content-Type", contentTypeJSON)
 	rw.WriteHeader(http.StatusOK)
 }
 
+// GetPingDBHandler checks if database is connected
 func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
-	if s.Database.DB == nil {
+	if s.StorageType != types.StorageTypeDB {
 		http.Error(rw, "nil database pointer", http.StatusInternalServerError)
 		return
 	}
-	if err := s.Database.DB.Ping(); err != nil {
+	if err := s.Storage.Check(); err != nil {
 		http.Error(rw, "error occured while connecting to database", http.StatusInternalServerError)
 		loggers.ErrorLogger.Println("db.Ping error:", err)
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
-}
-
-func (s *Server) GetMetricValue(rw http.ResponseWriter, r *http.Request, m Metrics) (Metrics, error) {
-	if s.Database.DB != nil {
-		switch m.MType {
-		case "gauge":
-			var value float64
-			err := s.Database.SelectOneGaugeFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&value)
-			if err != nil {
-				loggers.ErrorLogger.Println("db query error:", err)
-				return m, err
-			}
-			m.Value = &value
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
-				m.Hash = string(metricHash)
-			}
-		case "counter":
-			var delta int64
-			err := s.Database.SelectOneCounterFromDatabaseStmt.QueryRowContext(r.Context(), m.ID).Scan(&delta)
-			if err != nil {
-				return m, ErrTypeNotFound
-			}
-			m.Delta = &delta
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
-				m.Hash = string(metricHash)
-			}
-		default:
-			if s.Debug {
-				loggers.DebugLogger.Println("There is no metric you requested")
-			}
-			return m, ErrTypeNotFound
-		}
-	} else {
-		switch m.MType {
-		case "counter":
-			val, isIn := s.storage.CounterMetrics[m.ID]
-			if !isIn {
-				if s.Debug {
-					loggers.DebugLogger.Println("There is no metric you requested")
-				}
-				return m, ErrTypeNotFound
-			}
-			m.Delta = &val
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key)
-				m.Hash = string(metricHash)
-			}
-		case "gauge":
-			val, isIn := s.storage.GaugeMetrics[m.ID]
-			if !isIn {
-				if s.Debug {
-					loggers.DebugLogger.Println("There is no metric you requested")
-				}
-				return m, ErrTypeNotFound
-			}
-			m.Value = &val
-			if s.Key != "" {
-				metricHash := hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key)
-				m.Hash = string(metricHash)
-			}
-		default:
-			if s.Debug {
-				loggers.DebugLogger.Println("There is no metric you requested")
-			}
-			return m, ErrTypeNotFound
-		}
-	}
-	return m, nil
-}
-
-func (s *Server) storeMetrics(m Metrics) error {
-	switch m.MType {
-	case "gauge":
-		if m.Value == nil {
-			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
-		}
-		if s.Key != "" && m.Hash != "" {
-			if s.Debug {
-				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))
-			}
-			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))) {
-				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
-			}
-		}
-		s.storage.GaugeMetrics[m.ID] = *m.Value
-	case "counter":
-		if m.Delta == nil {
-			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
-		}
-		if s.Key != "" && m.Hash != "" {
-			if s.Debug {
-				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))
-			}
-			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))) {
-				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
-			}
-		}
-		s.storage.CounterMetrics[m.ID] += *m.Delta
-	default:
-		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)
-	}
-	return nil
-}
-
-func (s *Server) storeMetricsToDatabase(m Metrics) error {
-	switch m.MType {
-	case "gauge":
-		if m.Value == nil {
-			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
-		}
-		if s.Key != "" && m.Hash != "" {
-			if s.Debug {
-				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))
-			}
-			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:gauge:%f", m.ID, *m.Value), s.Key))) {
-				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
-			}
-		}
-		_, err := s.Database.InsertUpdateGaugeToDatabaseStmt.Exec(m.ID, *m.Value)
-		if err != nil {
-			return err
-		}
-	case "counter":
-		if m.Delta == nil {
-			return fmt.Errorf("%wno value in update request", ErrTypeNotImplemented)
-		}
-		if s.Key != "" && m.Hash != "" {
-			if s.Debug {
-				loggers.DebugLogger.Println(m.Hash, "     -     ", hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))
-			}
-			if !hmac.Equal([]byte(m.Hash), []byte(hash(fmt.Sprintf("%s:counter:%d", m.ID, *m.Delta), s.Key))) {
-				return fmt.Errorf("%wwrong hash in request", ErrTypeBadRequest)
-			}
-		}
-		var numberOfMetrics int
-		err := s.Database.CountIDsInDatabaseStmt.QueryRow(m.ID).Scan(&numberOfMetrics)
-		if err != nil {
-			return err
-		}
-		if numberOfMetrics != 0 {
-			var delta int64
-			err = s.Database.SelectOneCounterFromDatabaseStmt.QueryRow(m.ID).Scan(&delta)
-			if err != nil {
-				return err
-			}
-			_, err = s.Database.UpdateCounterToDatabaseStmt.Exec(m.ID, delta+*m.Delta)
-			if err != nil {
-				return err
-			}
-		} else {
-			_, err = s.Database.InsertCounterToDatabaseStmt.Exec(m.ID, *m.Delta)
-			if err != nil {
-				return err
-			}
-		}
-	default:
-		return fmt.Errorf("%wno such type of metric", ErrTypeNotImplemented)
-	}
-	return nil
-}
-
-func (s *Server) StoreManyMetrics(metrics []Metrics) error {
-	var err error
-	for _, m := range metrics {
-		if s.Database.DB != nil {
-			err = s.storeMetricsToDatabase(m)
-		} else {
-			err = s.storeMetrics(m)
-		}
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }

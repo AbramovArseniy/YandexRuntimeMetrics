@@ -7,6 +7,7 @@ import (
 	"time"
 )
 
+// Metrics saves metric info
 type Metrics struct {
 	ID    string   `json:"id"`
 	MType string   `json:"type"`
@@ -15,6 +16,7 @@ type Metrics struct {
 	Hash  string   `json:"hash,omitempty"`
 }
 
+// UtilizationData collects cpu and mem metrics
 type UtilizationData struct {
 	mu              sync.Mutex
 	TotalMemory     Metrics
@@ -24,11 +26,13 @@ type UtilizationData struct {
 	CPUutilLastTime time.Time
 }
 
+// metricCollector collects metrics
 type metricCollector struct {
 	RuntimeMetrics []Metrics
 	PollCount      Metrics
 }
 
+// newCollector creates a new metricCollector
 func newCollector() *metricCollector {
 	var delta int64 = 0
 	return &metricCollector{
@@ -40,16 +44,19 @@ func newCollector() *metricCollector {
 	}
 }
 
+// metricSender sends all metrics to the server
 type metricSender struct {
 	client *http.Client
 }
 
+// NewSender created new metricSender
 func NewSender() *metricSender {
 	return &metricSender{
 		client: &http.Client{},
 	}
 }
 
+// Agent makes all the work with metrics
 type Agent struct {
 	sender           *metricSender
 	collector        *metricCollector
@@ -63,6 +70,7 @@ type Agent struct {
 	UtilData         UtilizationData
 }
 
+// NewAgent creates new Agent
 func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration, key string, rateLimit int) *Agent {
 	return &Agent{
 		Address:          addr,

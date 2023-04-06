@@ -1,3 +1,4 @@
+// Module loggers logs events
 package loggers
 
 import (
@@ -5,6 +6,7 @@ import (
 	"os"
 )
 
+// Types of loggers
 var (
 	DebugLogger = log.New(os.Stdout, "DEBUG \t", log.LstdFlags)
 	ErrorLogger = log.New(os.Stdout, "ERROR \t", log.LstdFlags)

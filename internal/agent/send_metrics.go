@@ -12,16 +12,19 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
+//metricWorker gets metrics from channel and sends them to the server
 type metricWorker struct {
 	ch chan Metrics
 	a  *Agent
 	mu sync.Mutex
 }
 
+// Compress compresses data sent to the server
 func Compress(data []byte) ([]byte, error) {
 	var b bytes.Buffer
 	w, err := gzip.NewWriterLevel(&b, gzip.BestCompression)
@@ -46,10 +49,11 @@ func hash(src, key string) string {
 	return fmt.Sprintf("%x", dst)
 }
 
+// SendMetric sends one metric from
 func (w *metricWorker) SendMetric() error {
+	w.mu.Lock()
+	defer w.mu.Unlock()
 	for metric := range w.ch {
-		w.mu.Lock()
-		defer w.mu.Unlock()
 		url := w.a.UpdateAddress
 		if w.a.Key != "" {
 			if metric.MType == "gauge" {
@@ -88,13 +92,14 @@ func (w *metricWorker) SendMetric() error {
 	return nil
 }
 
+// ReadMetrics sends all metrics to channel
 func (w *metricWorker) ReadMetrics(ctx context.Context) {
 	newMetrics := w.a.collector.CollectRandomValueMetric()
 	metrics := w.a.collector.RuntimeMetrics
 	metrics = append(metrics, newMetrics)
 	metrics = append(metrics, w.a.UtilData.CPUutilizations...)
 	metrics = append(metrics, w.a.UtilData.TotalMemory, w.a.UtilData.FreeMemory)
-	w.a.collector.RuntimeMetrics = append(w.a.collector.RuntimeMetrics, newMetrics, w.a.collector.PollCount)
+	w.a.collector.RuntimeMetrics = append(metrics, newMetrics, w.a.collector.PollCount)
 	for _, metric := range w.a.collector.RuntimeMetrics {
 		select {
 		case <-ctx.Done():
@@ -105,6 +110,7 @@ func (w *metricWorker) ReadMetrics(ctx context.Context) {
 	}
 }
 
+// SendAllMetrics sends all metrics to the server one by one
 func (a *Agent) SendAllMetrics() {
 	ctx := context.Background()
 	g, _ := errgroup.WithContext(ctx)
@@ -124,6 +130,7 @@ func (a *Agent) SendAllMetrics() {
 	loggers.InfoLogger.Println("Sent Gauge")
 }
 
+// SendAllMetricsAsButch sends all metrics at one time
 func (a *Agent) SendAllMetricsAsButch() {
 	var metricHash string
 	url := a.UpdateAllAddress

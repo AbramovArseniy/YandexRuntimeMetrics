@@ -1,3 +1,4 @@
+// Module main starts agent
 package main
 
 import (
@@ -9,11 +10,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/shirou/gopsutil/cpu"
+
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
-	"github.com/shirou/gopsutil/cpu"
 )
 
+// default agent preferences
 const (
 	defaultPollInterval   = 2 * time.Second
 	defaultReportInterval = 10 * time.Second
@@ -21,6 +24,7 @@ const (
 	defaultRateLimit      = 100
 )
 
+// setAgentParams set agent config
 func setAgentParams() (string, time.Duration, time.Duration, string, int) {
 	var (
 		flagPollInterval   time.Duration
@@ -75,6 +79,7 @@ func setAgentParams() (string, time.Duration, time.Duration, string, int) {
 	return address, pollInterval, reportInterval, key, rateLimit
 }
 
+// main starts agent
 func main() {
 	a := agent.NewAgent(setAgentParams())
 	cpuStat, err := cpu.Times(true)
