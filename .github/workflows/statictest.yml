@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - main
-      - iter17
+      - iter18
 jobs:
 
   statictest:

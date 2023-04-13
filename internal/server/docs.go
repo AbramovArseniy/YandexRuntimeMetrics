@@ -1,2 +1,2 @@
-// Module server handles requests to servers
+// Package server handles requests to servers
 package server

@@ -77,7 +77,7 @@ func CompressHandler(next http.Handler) http.Handler {
 	})
 }
 
-// CompressHandler is a middleware that decompresses data from gzip
+// DecompressHandler is a middleware that decompresses data from gzip
 func DecompressHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if strings.Contains(r.Header.Get("Content-Encoding"), "gzip") {
@@ -113,7 +113,7 @@ func GetGaugeStatusOK(rw http.ResponseWriter, metricVal float64) {
 func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 	rw.WriteHeader(http.StatusOK)
 	rw.Header().Add("Content-Type", "text/plain")
-	_, err := rw.Write([]byte(fmt.Sprintf("%d", metricVal)))
+	_, err := fmt.Fprintf(rw, "%d", metricVal)
 	if err != nil {
 		loggers.ErrorLogger.Println("response writer error:", err)
 		return
@@ -134,14 +134,14 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	for _, m := range metrics {
 		switch m.MType {
 		case "counter":
-			_, err := rw.Write([]byte(fmt.Sprintf("%s: %d", m.ID, *m.Delta)))
+			_, err := fmt.Fprintf(rw, "%s: %d", m.ID, *m.Delta)
 			if err != nil {
 				http.Error(rw, fmt.Sprintf("error while writing response body: %v", err), http.StatusInternalServerError)
 				loggers.ErrorLogger.Println("error while writing response body:", err)
 				return
 			}
 		case "gauge":
-			_, err := rw.Write([]byte(fmt.Sprintf("%s: %f", m.ID, *m.Value)))
+			_, err := fmt.Fprintf(rw, "%s: %f", m.ID, *m.Value)
 			if err != nil {
 				http.Error(rw, fmt.Sprintf("error while writing response body: %v", err), http.StatusInternalServerError)
 				loggers.ErrorLogger.Println("error while writing response body:", err)
@@ -220,10 +220,11 @@ func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 		ID:    chi.URLParam(r, "name"),
 		MType: chi.URLParam(r, "type"),
 	}
+	var err error
 	if s.Debug {
 		loggers.DebugLogger.Printf("GET %s %s", m.MType, m.ID)
 	}
-	if m, err := s.Storage.GetMetric(m, s.Key); err == nil {
+	if m, err = s.Storage.GetMetric(m, s.Key); err == nil {
 		if s.Debug {
 			loggers.DebugLogger.Println(m.ID, *m.Delta)
 		}

@@ -1,4 +1,4 @@
-// Module main starts server
+// Package main starts server
 package main
 
 import (
@@ -57,7 +57,8 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	if storeFile, exists = os.LookupEnv("STORE_FILE"); !exists {
 		storeFile = flagStoreFile
 	}
-	if strStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); !exists {
+	var strStoreInterval, strRestore, key, database string
+	if strStoreInterval, exists = os.LookupEnv("STORE_INTERVAL"); !exists {
 		storeInterval = flagStoreInterval
 	} else {
 		var err error
@@ -66,7 +67,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 			storeInterval = flagStoreInterval
 		}
 	}
-	if strRestore, exists := os.LookupEnv("RESTORE"); !exists {
+	if strRestore, exists = os.LookupEnv("RESTORE"); !exists {
 		restore = flagRestore
 	} else {
 		var err error
@@ -75,11 +76,11 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 			restore = flagRestore
 		}
 	}
-	key, exists := os.LookupEnv("KEY")
+	key, exists = os.LookupEnv("KEY")
 	if !exists {
 		key = flagKey
 	}
-	database, exists := os.LookupEnv("DATABASE_DSN")
+	database, exists = os.LookupEnv("DATABASE_DSN")
 	if !exists {
 		database = flagDataBase
 	}

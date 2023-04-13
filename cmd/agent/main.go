@@ -1,4 +1,4 @@
-// Module main starts agent
+// Package main starts agent
 package main
 
 import (

@@ -1,3 +1,4 @@
+// Package filestorage works with filestorage
 package filestorage
 
 import (
@@ -63,7 +64,8 @@ func (fs FileStorage) storeMetricsToFile() {
 			Delta: &value,
 			MType: "counter",
 		}
-		jsonMetric, err := json.Marshal(gauge)
+		var jsonMetric []byte
+		jsonMetric, err = json.Marshal(gauge)
 		if err != nil {
 			loggers.ErrorLogger.Printf("error while marshalling json to file: %v", err)
 		}
@@ -82,7 +84,8 @@ func (fs FileStorage) storeMetricsToFile() {
 			Value: &value,
 			MType: "gauge",
 		}
-		jsonMetric, err := json.Marshal(gauge)
+		var jsonMetric []byte
+		jsonMetric, err = json.Marshal(gauge)
 		if err != nil {
 			loggers.ErrorLogger.Printf("error while marshalling json to file: %v", err)
 		}

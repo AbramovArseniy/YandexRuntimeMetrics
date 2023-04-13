@@ -1,4 +1,4 @@
-// Module myerrors has types of errors
+// Package myerrors contains types of errors
 package myerrors
 
 import "errors"
@@ -6,8 +6,8 @@ import "errors"
 // ErrTypeNotImplemented for http status not implemented
 var ErrTypeNotImplemented = errors.New("not implemented: ")
 
-// ErrTypeNotImplemented for http status bad request
+// ErrTypeBadRequest for http status bad request
 var ErrTypeBadRequest = errors.New("bad request: ")
 
-// ErrTypeNotImplemented for http status not found
+// ErrTypeNotFound for http status not found
 var ErrTypeNotFound = errors.New("not found: ")
