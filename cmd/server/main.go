@@ -30,6 +30,8 @@ const (
 	defaultRestore       = true
 )
 
+var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
+
 // setServerParams sets server config
 func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
 	var (
@@ -121,6 +123,10 @@ func StartServer() {
 	}
 
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
+	loggers.InfoLogger.Printf(`Build version: %s
+	Build date: %s
+	Build commit: %s`,
+		buildVersion, buildDate, buildCommit)
 	err = http.ListenAndServe(srv.Addr, srv.Handler)
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)
