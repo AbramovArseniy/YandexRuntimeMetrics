@@ -30,6 +30,7 @@ const (
 	defaultRestore       = true
 )
 
+// build info
 var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
 
 // setServerParams sets server config

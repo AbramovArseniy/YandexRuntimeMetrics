@@ -1,4 +1,4 @@
-// Package database works with server's database
+// Module database works with server's database
 package database
 
 import (
@@ -95,7 +95,7 @@ func SetDatabase(db *sql.DB, dbAddress string) error {
 		return fmt.Errorf("could not create driver: %w", err)
 	}
 	m, err := migrate.NewWithDatabaseInstance(
-		"file//./internal/server/database/migrations",
+		"file://./internal/server/database/migrations",
 		dbAddress, driver)
 	if err != nil {
 		return fmt.Errorf("could not create migration: %w", err)
