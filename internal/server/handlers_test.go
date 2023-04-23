@@ -19,7 +19,7 @@ import (
 func Example() {
 	fs := filestorage.NewFileStorage("/tmp/metrics-example.json", 5*time.Second, false)
 	fs.SetFileStorage()
-	s := NewServer("locashost:8080", false, fs, nil, "")
+	s := NewServer("locashost:8080", false, fs, nil, "", "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -141,7 +141,7 @@ func Example() {
 func BenchmarkTextPlainMetricHandler(b *testing.B) {
 	fs := filestorage.NewFileStorage("/tmp/metrics-test.json", 5*time.Second, false)
 	fs.SetFileStorage()
-	s := NewServer("locashost:8080", false, fs, nil, "")
+	s := NewServer("locashost:8080", false, fs, nil, "", "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -192,7 +192,7 @@ func BenchmarkTextPlainMetricHandler(b *testing.B) {
 func BenchmarkJSONMetricHandler(b *testing.B) {
 	fs := filestorage.NewFileStorage("/tmp/metrics-test.json", 5*time.Second, false)
 	fs.SetFileStorage()
-	s := NewServer("http://locashost:8080", false, fs, nil, "")
+	s := NewServer("http://locashost:8080", false, fs, nil, "", "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -327,7 +327,7 @@ func TestPlainTextHandler(t *testing.T) {
 		},
 	}
 	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
-	s := NewServer("locashost:8080", false, fs, nil, "")
+	s := NewServer("locashost:8080", false, fs, nil, "", "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -452,7 +452,7 @@ func TestJSONHandlers(t *testing.T) {
 		},
 	}
 	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
-	s := NewServer("locashost:8080", false, fs, nil, "")
+	s := NewServer("locashost:8080", false, fs, nil, "", "")
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)

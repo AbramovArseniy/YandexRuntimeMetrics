@@ -1,9 +1,14 @@
 package server
 
 import (
+	"bytes"
 	"compress/gzip"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"database/sql"
 	_ "net/http/pprof"
+	"os"
 
 	//"database/sql"
 	"encoding/json"
@@ -34,14 +39,35 @@ type Server struct {
 	Key         string
 	Storage     storage.Storage
 	StorageType types.StorageType
+	CryptoKey   *rsa.PrivateKey
 }
 
 // NewServer creates new Server
-func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.DB, key string) *Server {
+func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.DB, key string, cryptoKeyFile string) *Server {
 	var (
 		storage     storage.Storage
 		storageType types.StorageType
 	)
+
+	var cryptoKey *rsa.PrivateKey
+	if cryptoKeyFile != "" {
+		file, err := os.OpenFile(cryptoKeyFile, os.O_RDONLY, 0777)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while opening crypto key file:", err)
+			cryptoKey = nil
+		} else {
+			cryptoKeyByte, err := io.ReadAll(file)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while reading crypto key file:", err)
+				cryptoKey = nil
+			}
+			cryptoKey, err = x509.ParsePKCS1PrivateKey(cryptoKeyByte)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while parsing crypto key:", err)
+				cryptoKey = nil
+			}
+		}
+	}
 	if db == nil {
 		storage = fs
 		storageType = types.StorageTypeFile
@@ -55,6 +81,7 @@ func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.D
 		Key:         key,
 		Storage:     storage,
 		StorageType: storageType,
+		CryptoKey:   cryptoKey,
 	}
 }
 
@@ -74,6 +101,24 @@ func CompressHandler(next http.Handler) http.Handler {
 
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(types.GZIPWriter{ResponseWriter: w, Writer: gz}, r)
+	})
+}
+
+func (s *Server) DecodeHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			loggers.ErrorLogger.Println("DecodeHandler: error while reading request body:", err)
+		} else {
+			decodedBody, err := rsa.DecryptPKCS1v15(rand.Reader, s.CryptoKey, body)
+			if err != nil {
+				loggers.ErrorLogger.Println("DecodeHandler: error while reading request body:", err)
+			} else {
+				newReqBody := bytes.NewReader(decodedBody)
+				r.Body = io.NopCloser(newReqBody)
+			}
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 

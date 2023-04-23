@@ -29,19 +29,21 @@ const (
 var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
 
 // setAgentParams set agent config
-func setAgentParams() (string, time.Duration, time.Duration, string, int) {
+func setAgentParams() (string, time.Duration, time.Duration, string, int, string) {
 	var (
 		flagPollInterval   time.Duration
 		flagReportInterval time.Duration
 		flagRateLimit      int
 		flagAddress        string
 		flagKey            string
+		flagCryptoKeyFile  string
 	)
 	flag.DurationVar(&flagPollInterval, "p", defaultPollInterval, "poll_metrics_interval")
 	flag.DurationVar(&flagReportInterval, "r", defaultReportInterval, "report_metrics_interval")
 	flag.IntVar(&flagRateLimit, "l", defaultRateLimit, "rate_limit")
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
 	flag.StringVar(&flagKey, "k", "", "hash_key")
+	flag.StringVar(&flagCryptoKeyFile, "crypto-key", "", "crypto_key_file")
 	flag.Parse()
 	var pollInterval, reportInterval time.Duration
 	if strPollInterval, exists := os.LookupEnv("POLL_INTERVAL"); !exists {
@@ -80,7 +82,11 @@ func setAgentParams() (string, time.Duration, time.Duration, string, int) {
 	if !exists {
 		key = flagKey
 	}
-	return address, pollInterval, reportInterval, key, rateLimit
+	cryptoKeyFile, exists := os.LookupEnv("CRYPTO_KEY")
+	if !exists {
+		cryptoKeyFile = flagCryptoKeyFile
+	}
+	return address, pollInterval, reportInterval, key, rateLimit, cryptoKeyFile
 }
 
 // main starts agent

@@ -39,7 +39,7 @@ func TestSendCounter(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100)
+	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100, "")
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Metrics{
@@ -107,7 +107,7 @@ func TestSendGauge(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100)
+	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100, "")
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Metrics{

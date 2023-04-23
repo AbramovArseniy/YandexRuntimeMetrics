@@ -34,7 +34,7 @@ const (
 var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
 
 // setServerParams sets server config
-func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
+func setServerParams() (string, time.Duration, string, bool, bool, string, string, string) {
 	var (
 		flagRestore, restore             bool
 		flagStoreFile, storeFile         string
@@ -43,6 +43,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 		flagDebug                        bool
 		flagKey                          string
 		flagDataBase                     string
+		flagCryptoKeyFile                string
 	)
 
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
@@ -52,6 +53,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	flag.BoolVar(&flagDebug, "debug", false, "debug_true/false")
 	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.StringVar(&flagDataBase, "d", "", "db_address")
+	flag.StringVar(&flagCryptoKeyFile, "crypto-key", "", "crypto_key_file")
 	flag.Parse()
 	address, exists := os.LookupEnv("ADDRESS")
 	if !exists {
@@ -87,12 +89,16 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	if !exists {
 		database = flagDataBase
 	}
-	return address, storeInterval, storeFile, restore, flagDebug, key, database
+	cryptoKeyFile, exists := os.LookupEnv("CRYPTO_KEY")
+	if !exists {
+		cryptoKeyFile = flagCryptoKeyFile
+	}
+	return address, storeInterval, storeFile, restore, flagDebug, key, database, cryptoKeyFile
 }
 
 // StartServer starts server
 func StartServer() {
-	address, storeInterval, storeFile, restore, debug, key, dbAddress := setServerParams()
+	address, storeInterval, storeFile, restore, debug, key, dbAddress, cryptoKeyFile := setServerParams()
 	var db *sql.DB
 	var fs filestorage.FileStorage
 	var err error
@@ -115,7 +121,7 @@ func StartServer() {
 		fs = filestorage.NewFileStorage(storeFile, storeInterval, restore)
 		fs.SetFileStorage()
 	}
-	s := server.NewServer(address, debug, fs, db, key)
+	s := server.NewServer(address, debug, fs, db, key, cryptoKeyFile)
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
 	srv := &http.Server{
