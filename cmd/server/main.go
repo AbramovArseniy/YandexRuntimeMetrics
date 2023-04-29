@@ -43,7 +43,7 @@ func StartServer() {
 	handler := server.DecompressHandler(s.Router())
 	handler = server.CompressHandler(handler)
 	srv := &http.Server{
-		Addr:    s.Addr,
+		Addr:    cfg.Address,
 		Handler: handler,
 	}
 
