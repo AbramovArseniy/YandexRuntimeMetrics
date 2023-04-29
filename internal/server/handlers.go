@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"database/sql"
 	_ "net/http/pprof"
 	"os"
 
@@ -24,6 +23,7 @@ import (
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
 	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/storage"
@@ -36,22 +36,22 @@ const contentTypeJSON = "application/json"
 type Server struct {
 	Addr        string
 	Debug       bool
-	Key         string
+	HashKey     string
 	Storage     storage.Storage
 	StorageType types.StorageType
 	CryptoKey   *rsa.PrivateKey
 }
 
 // NewServer creates new Server
-func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.DB, key string, cryptoKeyFile string) *Server {
+func NewServer(cfg config.Config) *Server {
 	var (
 		storage     storage.Storage
 		storageType types.StorageType
 	)
 
 	var cryptoKey *rsa.PrivateKey
-	if cryptoKeyFile != "" {
-		file, err := os.OpenFile(cryptoKeyFile, os.O_RDONLY, 0777)
+	if cfg.CryptoKeyFile != "" {
+		file, err := os.OpenFile(cfg.CryptoKeyFile, os.O_RDONLY, 0777)
 		if err != nil {
 			loggers.ErrorLogger.Println("error while opening crypto key file:", err)
 			cryptoKey = nil
@@ -68,17 +68,18 @@ func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.D
 			}
 		}
 	}
-	if db == nil {
+	if cfg.Database == nil {
+		fs := filestorage.NewFileStorage(cfg.StoreFile, cfg.StoreInterval, cfg.Restore)
+		fs.SetFileStorage()
 		storage = fs
 		storageType = types.StorageTypeFile
 	} else {
-		storage = database.NewDatabase(db)
+		storage = database.NewDatabase(cfg.Database)
 		storageType = types.StorageTypeDB
 	}
 	return &Server{
-		Addr:        address,
-		Debug:       debug,
-		Key:         key,
+		Debug:       cfg.Debug,
+		HashKey:     cfg.HashKey,
 		Storage:     storage,
 		StorageType: storageType,
 		CryptoKey:   cryptoKey,
@@ -212,7 +213,7 @@ func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Re
 	if s.Debug {
 		loggers.DebugLogger.Println("POST many metrics request")
 	}
-	err := s.Storage.SaveManyMetrics(metrics, s.Key)
+	err := s.Storage.SaveManyMetrics(metrics, s.HashKey)
 	if errors.Is(err, myerrors.ErrTypeNotImplemented) {
 		http.Error(rw, err.Error(), http.StatusNotImplemented)
 	}
@@ -245,7 +246,7 @@ func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 		}
 		m.Value = &value
 	}
-	err := s.Storage.SaveMetric(m, s.Key)
+	err := s.Storage.SaveMetric(m, s.HashKey)
 	if errors.Is(err, myerrors.ErrTypeNotImplemented) {
 		http.Error(rw, err.Error(), http.StatusNotImplemented)
 	}
@@ -269,7 +270,7 @@ func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	if s.Debug {
 		loggers.DebugLogger.Printf("GET %s %s", m.MType, m.ID)
 	}
-	if m, err = s.Storage.GetMetric(m, s.Key); err == nil {
+	if m, err = s.Storage.GetMetric(m, s.HashKey); err == nil {
 		if s.Debug {
 			loggers.DebugLogger.Println(m.ID, *m.Delta)
 		}
@@ -323,7 +324,7 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 	if s.Debug {
 		loggers.DebugLogger.Println("POST JSON " + m.ID + " " + m.MType)
 	}
-	err := s.Storage.SaveMetric(m, s.Key)
+	err := s.Storage.SaveMetric(m, s.HashKey)
 	if errors.Is(err, myerrors.ErrTypeNotImplemented) {
 		http.Error(rw, err.Error(), http.StatusNotImplemented)
 		return
@@ -379,7 +380,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 	if s.Debug {
 		loggers.DebugLogger.Println("Get JSON:", m)
 	}
-	m, err = s.Storage.GetMetric(m, s.Key)
+	m, err = s.Storage.GetMetric(m, s.HashKey)
 	if s.Debug {
 		loggers.DebugLogger.Println(m)
 	}

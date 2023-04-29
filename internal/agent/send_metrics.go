@@ -57,11 +57,11 @@ func (w *metricWorker) SendMetric() error {
 	defer w.mu.Unlock()
 	for metric := range w.ch {
 		url := w.a.UpdateAddress
-		if w.a.Key != "" {
+		if w.a.HashKey != "" {
 			if metric.MType == "gauge" {
-				metric.Hash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), w.a.Key)
+				metric.Hash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), w.a.HashKey)
 			} else {
-				metric.Hash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), w.a.Key)
+				metric.Hash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), w.a.HashKey)
 			}
 		}
 		byteJSON, err := json.Marshal(metric)
@@ -149,32 +149,32 @@ func (a *Agent) SendAllMetricsAsButch() {
 	a.collector.RuntimeMetrics = append(a.collector.RuntimeMetrics, a.collector.PollCount)
 	var metrics []Metrics
 	for _, metric := range a.collector.RuntimeMetrics {
-		if a.Key != "" {
+		if a.HashKey != "" {
 			if metric.MType == "gauge" {
-				metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+				metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.HashKey)
 			} else {
-				metricHash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), a.Key)
+				metricHash = hash(fmt.Sprintf("%s:counter:%d", metric.ID, *metric.Delta), a.HashKey)
 			}
 			metric.Hash = metricHash
 		}
 		metrics = append(metrics, metric)
 	}
 	for _, metric := range a.UtilData.CPUutilizations {
-		if a.Key != "" {
-			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+		if a.HashKey != "" {
+			metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.HashKey)
 			metric.Hash = metricHash
 		}
 		metrics = append(metrics, metric)
 	}
 	metric := a.UtilData.TotalMemory
-	if a.Key != "" {
-		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+	if a.HashKey != "" {
+		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.HashKey)
 		metric.Hash = metricHash
 	}
 	metrics = append(metrics, metric)
 	metric = a.UtilData.FreeMemory
-	if a.Key != "" {
-		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.Key)
+	if a.HashKey != "" {
+		metricHash = hash(fmt.Sprintf("%s:gauge:%f", metric.ID, *metric.Value), a.HashKey)
 		metric.Hash = metricHash
 	}
 	metrics = append(metrics, metric)

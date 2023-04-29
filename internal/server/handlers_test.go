@@ -13,13 +13,18 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
 )
 
 func Example() {
-	fs := filestorage.NewFileStorage("/tmp/metrics-example.json", 5*time.Second, false)
-	fs.SetFileStorage()
-	s := NewServer("locashost:8080", false, fs, nil, "", "")
+	cfg := config.Config{
+		Address:       "locashost:8080",
+		Debug:         false,
+		StoreFile:     "/tmp/metrics-test.json",
+		StoreInterval: 5 * time.Second,
+		Restore:       false,
+	}
+	s := NewServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -139,9 +144,14 @@ func Example() {
 
 // BenchmarkTextPlainMetricHandler benchmark for handlers with Content-Type 'text/plain'
 func BenchmarkTextPlainMetricHandler(b *testing.B) {
-	fs := filestorage.NewFileStorage("/tmp/metrics-test.json", 5*time.Second, false)
-	fs.SetFileStorage()
-	s := NewServer("locashost:8080", false, fs, nil, "", "")
+	cfg := config.Config{
+		Address:       "locashost:8080",
+		Debug:         false,
+		StoreFile:     "/tmp/metrics-test.json",
+		StoreInterval: 5 * time.Second,
+		Restore:       false,
+	}
+	s := NewServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -190,9 +200,14 @@ func BenchmarkTextPlainMetricHandler(b *testing.B) {
 
 // BenchmarkJSONMetricHandler benchmark for handlers with Content-Type 'application/json'
 func BenchmarkJSONMetricHandler(b *testing.B) {
-	fs := filestorage.NewFileStorage("/tmp/metrics-test.json", 5*time.Second, false)
-	fs.SetFileStorage()
-	s := NewServer("http://locashost:8080", false, fs, nil, "", "")
+	cfg := config.Config{
+		Address:       "locashost:8080",
+		Debug:         false,
+		StoreFile:     "/tmp/metrics-test.json",
+		StoreInterval: 5 * time.Second,
+		Restore:       false,
+	}
+	s := NewServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -326,8 +341,14 @@ func TestPlainTextHandler(t *testing.T) {
 			want:   want{code: 404},
 		},
 	}
-	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
-	s := NewServer("locashost:8080", false, fs, nil, "", "")
+	cfg := config.Config{
+		Address:       "locashost:8080",
+		Debug:         false,
+		StoreFile:     "/tmp/metrics-test.json",
+		StoreInterval: 5 * time.Second,
+		Restore:       false,
+	}
+	s := NewServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -451,8 +472,14 @@ func TestJSONHandlers(t *testing.T) {
 			want:   want{code: 404},
 		},
 	}
-	fs := filestorage.NewFileStorage("/tmp/devops-metrics-db.json", 5*time.Second, false)
-	s := NewServer("locashost:8080", false, fs, nil, "", "")
+	cfg := config.Config{
+		Address:       "locashost:8080",
+		Debug:         false,
+		StoreFile:     "/tmp/metrics-test.json",
+		StoreInterval: 5 * time.Second,
+		Restore:       false,
+	}
+	s := NewServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
