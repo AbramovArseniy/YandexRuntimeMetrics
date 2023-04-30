@@ -234,8 +234,8 @@ func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Re
 	if err != nil {
 		loggers.ErrorLogger.Println("error while marshaling many metrics update response:", err)
 	}
-	rw.Write(byteResponse)
 	rw.Header().Add("Content-Type", contentTypeJSON)
+	rw.Write(byteResponse)
 }
 
 // PostMetricHandler updates info about one metric
