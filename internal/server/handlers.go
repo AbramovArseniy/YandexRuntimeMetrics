@@ -230,6 +230,7 @@ func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Re
 		loggers.ErrorLogger.Println("store many metrics error:", err)
 		return
 	}
+	rw.Header().Add("Content-Type", contentTypeJSON)
 }
 
 // PostMetricHandler updates info about one metric
