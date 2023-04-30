@@ -230,6 +230,11 @@ func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Re
 		loggers.ErrorLogger.Println("store many metrics error:", err)
 		return
 	}
+	byteResponse, err := json.Marshal(metrics)
+	if err != nil {
+		loggers.ErrorLogger.Println("error while marshaling many metrics update response:", err)
+	}
+	rw.Write(byteResponse)
 	rw.Header().Add("Content-Type", contentTypeJSON)
 }
 
