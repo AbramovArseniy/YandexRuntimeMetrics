@@ -1,4 +1,4 @@
-// Module repeating repeats an action
+// Package repeating repeats an action
 package repeating
 
 import "time"

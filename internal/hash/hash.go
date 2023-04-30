@@ -1,4 +1,4 @@
-// Module hash hashes data
+// Package hash hashes data
 package hash
 
 import (

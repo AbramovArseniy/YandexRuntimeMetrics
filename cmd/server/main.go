@@ -1,4 +1,4 @@
-// Module main starts server
+// Package main starts server
 package main
 
 import (
@@ -30,6 +30,9 @@ const (
 	defaultRestore       = true
 )
 
+// build info
+var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
+
 // setServerParams sets server config
 func setServerParams() (string, time.Duration, string, bool, bool, string, string) {
 	var (
@@ -57,7 +60,8 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 	if storeFile, exists = os.LookupEnv("STORE_FILE"); !exists {
 		storeFile = flagStoreFile
 	}
-	if strStoreInterval, exists := os.LookupEnv("STORE_INTERVAL"); !exists {
+	var strStoreInterval, strRestore, key, database string
+	if strStoreInterval, exists = os.LookupEnv("STORE_INTERVAL"); !exists {
 		storeInterval = flagStoreInterval
 	} else {
 		var err error
@@ -66,7 +70,7 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 			storeInterval = flagStoreInterval
 		}
 	}
-	if strRestore, exists := os.LookupEnv("RESTORE"); !exists {
+	if strRestore, exists = os.LookupEnv("RESTORE"); !exists {
 		restore = flagRestore
 	} else {
 		var err error
@@ -75,11 +79,11 @@ func setServerParams() (string, time.Duration, string, bool, bool, string, strin
 			restore = flagRestore
 		}
 	}
-	key, exists := os.LookupEnv("KEY")
+	key, exists = os.LookupEnv("KEY")
 	if !exists {
 		key = flagKey
 	}
-	database, exists := os.LookupEnv("DATABASE_DSN")
+	database, exists = os.LookupEnv("DATABASE_DSN")
 	if !exists {
 		database = flagDataBase
 	}
@@ -120,6 +124,10 @@ func StartServer() {
 	}
 
 	loggers.InfoLogger.Printf("Server started at %s", s.Addr)
+	loggers.InfoLogger.Printf(`Build version: %s
+	Build date: %s
+	Build commit: %s`,
+		buildVersion, buildDate, buildCommit)
 	err = http.ListenAndServe(srv.Addr, srv.Handler)
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)

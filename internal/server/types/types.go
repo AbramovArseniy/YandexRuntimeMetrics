@@ -1,3 +1,4 @@
+// Package types contains variable types
 package types
 
 import (

@@ -1,4 +1,4 @@
-// Module loggers logs events
+// Package loggers logs events
 package loggers
 
 import (

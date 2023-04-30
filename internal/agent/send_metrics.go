@@ -17,7 +17,7 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
-//metricWorker gets metrics from channel and sends them to the server
+// metricWorker gets metrics from channel and sends them to the server
 type metricWorker struct {
 	ch chan Metrics
 	a  *Agent

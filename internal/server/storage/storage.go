@@ -1,3 +1,4 @@
+// Package storage contains storage interface
 package storage
 
 import "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"

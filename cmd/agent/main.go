@@ -1,4 +1,4 @@
-// Module main starts agent
+// Package main starts agent
 package main
 
 import (
@@ -13,6 +13,7 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
 )
 
@@ -23,6 +24,9 @@ const (
 	defaultAddress        = "localhost:8080"
 	defaultRateLimit      = 100
 )
+
+// build info
+var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
 
 // setAgentParams set agent config
 func setAgentParams() (string, time.Duration, time.Duration, string, int) {
@@ -90,6 +94,10 @@ func main() {
 	numCPU := len(cpuStat)
 	a.UtilData.CPUtime = make([]float64, numCPU)
 	a.UtilData.CPUutilizations = make([]agent.Metrics, numCPU)
+	loggers.InfoLogger.Printf(`Build version: %s
+	Build date: %s
+	Build commit: %s`,
+		buildVersion, buildDate, buildCommit)
 	go repeating.Repeat(a.CollectRuntimeMetrics, a.PollInterval)
 	go repeating.Repeat(a.CollectUtilizationMetrics, a.PollInterval)
 	go repeating.Repeat(a.SendAllMetricsAsButch, a.ReportInterval)
