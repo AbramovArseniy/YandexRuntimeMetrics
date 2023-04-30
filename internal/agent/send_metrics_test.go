@@ -9,8 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/config"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/config"
 )
 
 // Default test preferences
