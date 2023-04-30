@@ -22,10 +22,9 @@ var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
 // StartServer starts server
 func StartServer() {
 	cfg := config.SetServerParams()
-	var db *sql.DB
 	var err error
 	if cfg.DatabaseAddress != "" {
-		db, err = sql.Open("pgx", cfg.DatabaseAddress)
+		cfg.Database, err = sql.Open("pgx", cfg.DatabaseAddress)
 		if err != nil {
 			loggers.ErrorLogger.Println("opening DB error:", err)
 			cfg.Database = nil
@@ -35,9 +34,9 @@ func StartServer() {
 				loggers.ErrorLogger.Println("error while setting database:", err)
 			}
 		}
-		defer db.Close()
+		defer cfg.Database.Close()
 	} else {
-		db = nil
+		cfg.Database = nil
 	}
 	s := server.NewServer(cfg)
 	handler := server.DecompressHandler(s.Router())
