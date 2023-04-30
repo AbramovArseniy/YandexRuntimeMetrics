@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"io"
 	"os"
 	"strconv"
 	"time"
@@ -44,7 +45,8 @@ func SetServerParams() (cfg Config) {
 		flagKey           string
 		flagDataBase      string
 		flagCryptoKeyFile string
-		flagConfig        string
+		flagConfigFile    string
+		cfgFile           string
 	)
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
 	flag.StringVar(&flagStoreFile, "f", defaultStoreFile, "store_file")
@@ -54,21 +56,25 @@ func SetServerParams() (cfg Config) {
 	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.StringVar(&flagDataBase, "d", "", "db_address")
 	flag.StringVar(&flagCryptoKeyFile, "crypto-key", "", "crypto_key_file")
-	flag.StringVar(&flagConfig, "c", "", "config_as_json")
+	flag.StringVar(&flagConfigFile, "c", "", "config_as_json")
 	flag.Parse()
 	var exists bool
-	if flagConfig != "" {
-		err := json.Unmarshal([]byte(flagConfig), &cfg)
+	if cfgFile, exists = os.LookupEnv("CONFIG"); !exists {
+		cfgFile = flagConfigFile
+	}
+	if cfgFile != "" {
+		file, err := os.Open(cfgFile)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while opening config file:", err)
+		}
+		cfgJSON, err := io.ReadAll(file)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while reading from config file:", err)
+		}
+		err = json.Unmarshal(cfgJSON, &cfg)
 		if err != nil {
 			loggers.ErrorLogger.Println("error while unmarshalling config json:", err)
 		}
-		return cfg
-	} else if config, exists := os.LookupEnv("CONFIG"); exists {
-		err := json.Unmarshal([]byte(config), &cfg)
-		if err != nil {
-			loggers.ErrorLogger.Println("error while unmarshalling config json:", err)
-		}
-		return cfg
 	}
 	cfg.Address, exists = os.LookupEnv("ADDRESS")
 	if !exists {

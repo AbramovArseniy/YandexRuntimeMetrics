@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"flag"
+	"io"
 	"log"
 	"os"
 	"strconv"
@@ -20,12 +21,12 @@ const (
 )
 
 type Config struct {
-	PollInterval   time.Duration
-	ReportInterval time.Duration
-	Address        string
+	PollInterval   time.Duration `json:"poll_interval"`
+	ReportInterval time.Duration `json:"report_interval"`
+	Address        string        `json:"address"`
 	RateLimit      int
 	HashKey        string
-	CryptoKeyFile  string
+	CryptoKeyFile  string `json:"crypto_key"`
 }
 
 // setAgentParams set agent config
@@ -37,7 +38,8 @@ func SetAgentParams() (cfg Config) {
 		flagAddress        string
 		flagKey            string
 		flagCryptoKeyFile  string
-		flagConfig         string
+		flagConfigFile     string
+		cfgFile            string
 	)
 	flag.DurationVar(&flagPollInterval, "p", defaultPollInterval, "poll_metrics_interval")
 	flag.DurationVar(&flagReportInterval, "r", defaultReportInterval, "report_metrics_interval")
@@ -45,21 +47,25 @@ func SetAgentParams() (cfg Config) {
 	flag.StringVar(&flagAddress, "a", defaultAddress, "server_address")
 	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.StringVar(&flagCryptoKeyFile, "crypto-key", "", "crypto_key_file")
-	flag.StringVar(&flagConfig, "c", "", "config_as_json")
+	flag.StringVar(&flagConfigFile, "c", "", "config_file_name")
 	flag.Parse()
 	var exists bool
-	if flagConfig != "" {
-		err := json.Unmarshal([]byte(flagConfig), &cfg)
+	if cfgFile, exists = os.LookupEnv("CONFIG"); !exists {
+		cfgFile = flagConfigFile
+	}
+	if cfgFile != "" {
+		file, err := os.Open(cfgFile)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while opening config file:", err)
+		}
+		cfgJSON, err := io.ReadAll(file)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while reading from config file:", err)
+		}
+		err = json.Unmarshal(cfgJSON, &cfg)
 		if err != nil {
 			loggers.ErrorLogger.Println("error while unmarshalling config json:", err)
 		}
-		return cfg
-	} else if config, exists := os.LookupEnv("CONFIG"); exists {
-		err := json.Unmarshal([]byte(config), &cfg)
-		if err != nil {
-			loggers.ErrorLogger.Println("error while unmarshalling config json:", err)
-		}
-		return cfg
 	}
 	if strPollInterval, exists := os.LookupEnv("POLL_INTERVAL"); !exists {
 		cfg.PollInterval = flagPollInterval
