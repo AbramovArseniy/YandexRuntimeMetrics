@@ -7,7 +7,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/hash"
@@ -184,7 +186,9 @@ func (fs FileStorage) SetFileStorage() {
 			loggers.ErrorLogger.Println("error while restoring from file:", err)
 		}
 	}
-	go repeating.Repeat(fs.storeMetricsToFile, fs.StoreInterval)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	go repeating.Repeat(sigs, fs.storeMetricsToFile, fs.StoreInterval)
 }
 
 // GetMetric gets info about one metric from MemStorage

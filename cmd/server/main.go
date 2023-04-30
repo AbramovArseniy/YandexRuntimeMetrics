@@ -2,9 +2,13 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"net/http"
 	_ "net/http/pprof"
+	"os"
+	"os/signal"
+	"syscall"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
@@ -51,7 +55,17 @@ func StartServer() {
 	Build date: %s
 	Build commit: %s`,
 		buildVersion, buildDate, buildCommit)
-	err = http.ListenAndServe(srv.Addr, srv.Handler)
+	idleConnsClosed := make(chan struct{})
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	go func() {
+		<-sigs
+		if err := srv.Shutdown(context.Background()); err != nil {
+			loggers.InfoLogger.Printf("HTTP server Shutdown: %v", err)
+		}
+		close(idleConnsClosed)
+	}()
+	err = srv.ListenAndServe()
 	if err != nil && err != http.ErrServerClosed {
 		loggers.ErrorLogger.Fatal(err)
 	}

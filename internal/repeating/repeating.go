@@ -1,13 +1,20 @@
 // Package repeating repeats an action
 package repeating
 
-import "time"
+import (
+	"os"
+	"time"
+)
 
 // Repeat repears action every interval seconds
-func Repeat(action func(), interval time.Duration) {
+func Repeat(sigs chan os.Signal, action func(), interval time.Duration) {
 	ticker := time.NewTicker(interval)
 	for {
-		<-ticker.C
-		action()
+		select {
+		case <-sigs:
+			return
+		case <-ticker.C:
+			action()
+		}
 	}
 }

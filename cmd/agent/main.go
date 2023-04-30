@@ -33,9 +33,11 @@ func main() {
 	Build date: %s
 	Build commit: %s`,
 		buildVersion, buildDate, buildCommit)
-	go repeating.Repeat(a.CollectRuntimeMetrics, a.PollInterval)
-	go repeating.Repeat(a.CollectUtilizationMetrics, a.PollInterval)
-	go repeating.Repeat(a.SendAllMetricsAsButch, a.ReportInterval)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	go repeating.Repeat(sigs, a.CollectRuntimeMetrics, a.PollInterval)
+	go repeating.Repeat(sigs, a.CollectUtilizationMetrics, a.PollInterval)
+	go repeating.Repeat(sigs, a.SendAllMetricsAsButch, a.ReportInterval)
 	log.Println("Agent started")
 	cancelSignal := make(chan os.Signal, 1)
 	signal.Notify(cancelSignal, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
