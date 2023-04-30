@@ -207,6 +207,11 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 
 // PostUpdateManyMetricsHandler updates info about several metrics
 func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != contentTypeJSON {
+		http.Error(rw, "wrong content type", http.StatusBadRequest)
+		loggers.ErrorLogger.Println("Wrong content type:", r.Header.Get("Content-Type"))
+		return
+	}
 	var metrics []types.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		loggers.ErrorLogger.Println("update many decode error:", err)
