@@ -14,6 +14,7 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
 )
 
@@ -41,11 +42,11 @@ type FileStorage struct {
 }
 
 // NewFileStorage creates new FileStorage
-func NewFileStorage(storeFile string, storeInterval time.Duration, restore bool) FileStorage {
+func NewFileStorage(cfg config.Config) FileStorage {
 	return FileStorage{
-		StoreInterval: storeInterval,
-		StoreFile:     storeFile,
-		Restore:       restore,
+		StoreInterval: cfg.StoreInterval,
+		StoreFile:     cfg.StoreFile,
+		Restore:       cfg.Restore,
 		storage:       NewMemStorage(),
 	}
 }

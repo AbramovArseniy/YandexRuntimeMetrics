@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/config"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -39,7 +40,13 @@ func TestSendCounter(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100, "")
+	cfg := config.Config{
+		PollInterval:   2 * time.Second,
+		ReportInterval: 10 * time.Second,
+		Address:        "localhost:8080",
+		RateLimit:      100,
+	}
+	a := NewAgent(cfg)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Metrics{
@@ -107,7 +114,13 @@ func TestSendGauge(t *testing.T) {
 			expectError: false,
 		},
 	}
-	a := NewAgent("localhost:8080", 2*time.Second, 10*time.Second, "", 100, "")
+	cfg := config.Config{
+		PollInterval:   2 * time.Second,
+		ReportInterval: 10 * time.Second,
+		Address:        "localhost:8080",
+		RateLimit:      100,
+	}
+	a := NewAgent(cfg)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			metric := Metrics{

@@ -6,7 +6,6 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"database/sql"
 	_ "net/http/pprof"
 	"os"
 
@@ -24,6 +23,7 @@ import (
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
 	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/storage"
@@ -43,15 +43,15 @@ type Server struct {
 }
 
 // NewServer creates new Server
-func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.DB, key string, cryptoKeyFile string) *Server {
+func NewServer(cfg config.Config) *Server {
 	var (
 		storage     storage.Storage
 		storageType types.StorageType
 	)
 
 	var cryptoKey *rsa.PrivateKey
-	if cryptoKeyFile != "" {
-		file, err := os.OpenFile(cryptoKeyFile, os.O_RDONLY, 0777)
+	if cfg.CryptoKeyFile != "" {
+		file, err := os.OpenFile(cfg.CryptoKeyFile, os.O_RDONLY, 0777)
 		if err != nil {
 			loggers.ErrorLogger.Println("error while opening crypto key file:", err)
 			cryptoKey = nil
@@ -68,17 +68,19 @@ func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.D
 			}
 		}
 	}
-	if db == nil {
+	if cfg.Database == nil {
+		fs := filestorage.NewFileStorage(cfg)
+		fs.SetFileStorage()
 		storage = fs
 		storageType = types.StorageTypeFile
 	} else {
-		storage = database.NewDatabase(db)
+		storage = database.NewDatabase(cfg.Database)
 		storageType = types.StorageTypeDB
 	}
 	return &Server{
-		Addr:        address,
-		Debug:       debug,
-		Key:         key,
+		Addr:        cfg.Address,
+		Debug:       cfg.Debug,
+		Key:         cfg.HashKey,
 		Storage:     storage,
 		StorageType: storageType,
 		CryptoKey:   cryptoKey,

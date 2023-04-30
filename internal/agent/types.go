@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/config"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
@@ -78,10 +79,10 @@ type Agent struct {
 }
 
 // NewAgent creates new Agent
-func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration, key string, rateLimit int, cryptoKeyFile string) *Agent {
+func NewAgent(cfg config.Config) *Agent {
 	var cryptoKey *rsa.PublicKey
-	if cryptoKeyFile != "" {
-		file, err := os.OpenFile(cryptoKeyFile, os.O_RDONLY, 0777)
+	if cfg.CryptoKeyFile != "" {
+		file, err := os.OpenFile(cfg.CryptoKeyFile, os.O_RDONLY, 0777)
 		if err != nil {
 			loggers.ErrorLogger.Println("error while opening crtypto key file:", err)
 			cryptoKey = nil
@@ -101,15 +102,15 @@ func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Durat
 		}
 	}
 	return &Agent{
-		Address:          addr,
-		UpdateAddress:    fmt.Sprintf("http://%s/update/", addr),
-		UpdateAllAddress: fmt.Sprintf("http://%s/updates/", addr),
+		Address:          cfg.Address,
+		UpdateAddress:    fmt.Sprintf("http://%s/update/", cfg.Address),
+		UpdateAllAddress: fmt.Sprintf("http://%s/updates/", cfg.Address),
 		sender:           NewSender(),
 		collector:        newCollector(),
-		PollInterval:     pollInterval,
-		ReportInterval:   reportInterval,
-		Key:              key,
-		RateLimit:        rateLimit,
+		PollInterval:     cfg.PollInterval,
+		ReportInterval:   cfg.ReportInterval,
+		Key:              cfg.HashKey,
+		RateLimit:        cfg.RateLimit,
 		CryptoKey:        cryptoKey,
 	}
 }
