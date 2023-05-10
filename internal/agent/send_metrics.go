@@ -5,6 +5,8 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/hmac"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -66,6 +68,14 @@ func (w *metricWorker) SendMetric() error {
 		if err != nil {
 			loggers.ErrorLogger.Println("json Marshal error:", err)
 			return err
+		}
+		if w.a.CryptoKey != nil {
+			codedJSON, err := rsa.EncryptPKCS1v15(rand.Reader, w.a.CryptoKey, byteJSON)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while coding json:", err)
+			} else {
+				byteJSON = codedJSON
+			}
 		}
 		compressedJSON, err := Compress(byteJSON)
 		if err != nil {

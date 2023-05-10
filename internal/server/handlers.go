@@ -1,9 +1,13 @@
 package server
 
 import (
+	"bytes"
 	"compress/gzip"
-	"database/sql"
+	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	_ "net/http/pprof"
+	"os"
 
 	//"database/sql"
 	"encoding/json"
@@ -19,6 +23,7 @@ import (
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
 	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/storage"
@@ -34,27 +39,51 @@ type Server struct {
 	Key         string
 	Storage     storage.Storage
 	StorageType types.StorageType
+	CryptoKey   *rsa.PrivateKey
 }
 
 // NewServer creates new Server
-func NewServer(address string, debug bool, fs filestorage.FileStorage, db *sql.DB, key string) *Server {
+func NewServer(cfg config.Config) *Server {
 	var (
 		storage     storage.Storage
 		storageType types.StorageType
 	)
-	if db == nil {
+
+	var cryptoKey *rsa.PrivateKey
+	if cfg.CryptoKeyFile != "" {
+		file, err := os.OpenFile(cfg.CryptoKeyFile, os.O_RDONLY, 0777)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while opening crypto key file:", err)
+			cryptoKey = nil
+		} else {
+			cryptoKeyByte, err := io.ReadAll(file)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while reading crypto key file:", err)
+				cryptoKey = nil
+			}
+			cryptoKey, err = x509.ParsePKCS1PrivateKey(cryptoKeyByte)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while parsing crypto key:", err)
+				cryptoKey = nil
+			}
+		}
+	}
+	if cfg.Database == nil {
+		fs := filestorage.NewFileStorage(cfg)
+		fs.SetFileStorage()
 		storage = fs
 		storageType = types.StorageTypeFile
 	} else {
-		storage = database.NewDatabase(db)
+		storage = database.NewDatabase(cfg.Database)
 		storageType = types.StorageTypeDB
 	}
 	return &Server{
-		Addr:        address,
-		Debug:       debug,
-		Key:         key,
+		Addr:        cfg.Address,
+		Debug:       cfg.Debug,
+		Key:         cfg.HashKey,
 		Storage:     storage,
 		StorageType: storageType,
+		CryptoKey:   cryptoKey,
 	}
 }
 
@@ -74,6 +103,24 @@ func CompressHandler(next http.Handler) http.Handler {
 
 		w.Header().Set("Content-Encoding", "gzip")
 		next.ServeHTTP(types.GZIPWriter{ResponseWriter: w, Writer: gz}, r)
+	})
+}
+
+func (s *Server) DecodeHandler(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			loggers.ErrorLogger.Println("DecodeHandler: error while reading request body:", err)
+		} else {
+			decodedBody, err := rsa.DecryptPKCS1v15(rand.Reader, s.CryptoKey, body)
+			if err != nil {
+				loggers.ErrorLogger.Println("DecodeHandler: error while reading request body:", err)
+			} else {
+				newReqBody := bytes.NewReader(decodedBody)
+				r.Body = io.NopCloser(newReqBody)
+			}
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 
@@ -160,6 +207,11 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 
 // PostUpdateManyMetricsHandler updates info about several metrics
 func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+	if r.Header.Get("Content-Type") != contentTypeJSON {
+		http.Error(rw, "wrong content type", http.StatusBadRequest)
+		loggers.ErrorLogger.Println("Wrong content type:", r.Header.Get("Content-Type"))
+		return
+	}
 	var metrics []types.Metrics
 	if err := json.NewDecoder(r.Body).Decode(&metrics); err != nil {
 		loggers.ErrorLogger.Println("update many decode error:", err)
@@ -178,6 +230,12 @@ func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Re
 		loggers.ErrorLogger.Println("store many metrics error:", err)
 		return
 	}
+	byteResponse, err := json.Marshal(metrics)
+	if err != nil {
+		loggers.ErrorLogger.Println("error while marshaling many metrics update response:", err)
+	}
+	rw.Header().Add("Content-Type", contentTypeJSON)
+	rw.Write(byteResponse)
 }
 
 // PostMetricHandler updates info about one metric

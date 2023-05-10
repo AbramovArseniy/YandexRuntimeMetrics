@@ -7,13 +7,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/hash"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/repeating"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
 )
 
@@ -41,11 +44,11 @@ type FileStorage struct {
 }
 
 // NewFileStorage creates new FileStorage
-func NewFileStorage(storeFile string, storeInterval time.Duration, restore bool) FileStorage {
+func NewFileStorage(cfg config.Config) FileStorage {
 	return FileStorage{
-		StoreInterval: storeInterval,
-		StoreFile:     storeFile,
-		Restore:       restore,
+		StoreInterval: cfg.StoreInterval,
+		StoreFile:     cfg.StoreFile,
+		Restore:       cfg.Restore,
 		storage:       NewMemStorage(),
 	}
 }
@@ -183,7 +186,9 @@ func (fs FileStorage) SetFileStorage() {
 			loggers.ErrorLogger.Println("error while restoring from file:", err)
 		}
 	}
-	go repeating.Repeat(fs.storeMetricsToFile, fs.StoreInterval)
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
+	go repeating.Repeat(sigs, fs.storeMetricsToFile, fs.StoreInterval)
 }
 
 // GetMetric gets info about one metric from MemStorage

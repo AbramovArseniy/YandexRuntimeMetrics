@@ -1,10 +1,17 @@
 package agent
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 	"sync"
 	"time"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/config"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
 // Metrics saves metric info
@@ -68,19 +75,42 @@ type Agent struct {
 	ReportInterval   time.Duration
 	RateLimit        int
 	UtilData         UtilizationData
+	CryptoKey        *rsa.PublicKey
 }
 
 // NewAgent creates new Agent
-func NewAgent(addr string, pollInterval time.Duration, reportInterval time.Duration, key string, rateLimit int) *Agent {
+func NewAgent(cfg config.Config) *Agent {
+	var cryptoKey *rsa.PublicKey
+	if cfg.CryptoKeyFile != "" {
+		file, err := os.OpenFile(cfg.CryptoKeyFile, os.O_RDONLY, 0777)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while opening crtypto key file:", err)
+			cryptoKey = nil
+		} else {
+			cryptoKeyByte, err := io.ReadAll(file)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while opening crtypto key file:", err)
+				cryptoKey = nil
+			}
+			var ok bool
+			key, err := x509.ParsePKIXPublicKey(cryptoKeyByte)
+			cryptoKey, ok = key.(*rsa.PublicKey)
+			if err != nil || !ok {
+				loggers.ErrorLogger.Println("error while opening crtypto key file:", err)
+				cryptoKey = nil
+			}
+		}
+	}
 	return &Agent{
-		Address:          addr,
-		UpdateAddress:    fmt.Sprintf("http://%s/update/", addr),
-		UpdateAllAddress: fmt.Sprintf("http://%s/updates/", addr),
+		Address:          cfg.Address,
+		UpdateAddress:    fmt.Sprintf("http://%s/update/", cfg.Address),
+		UpdateAllAddress: fmt.Sprintf("http://%s/updates/", cfg.Address),
 		sender:           NewSender(),
 		collector:        newCollector(),
-		PollInterval:     pollInterval,
-		ReportInterval:   reportInterval,
-		Key:              key,
-		RateLimit:        rateLimit,
+		PollInterval:     cfg.PollInterval,
+		ReportInterval:   cfg.ReportInterval,
+		Key:              cfg.HashKey,
+		RateLimit:        cfg.RateLimit,
+		CryptoKey:        cryptoKey,
 	}
 }

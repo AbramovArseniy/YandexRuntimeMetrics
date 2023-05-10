@@ -6,7 +6,6 @@ import (
 
 	"go/printer"
 
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/multichecker"
 	"golang.org/x/tools/go/analysis/passes/printf"
@@ -15,6 +14,8 @@ import (
 	"honnef.co/go/tools/simple"
 	"honnef.co/go/tools/staticcheck"
 	"honnef.co/go/tools/stylecheck"
+
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
 // run is an analyzing function
