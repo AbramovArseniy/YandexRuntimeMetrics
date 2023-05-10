@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"net"
 	_ "net/http/pprof"
 	"os"
 
@@ -34,12 +35,13 @@ const contentTypeJSON = "application/json"
 
 // Server has server info
 type Server struct {
-	Addr        string
-	Debug       bool
-	Key         string
-	Storage     storage.Storage
-	StorageType types.StorageType
-	CryptoKey   *rsa.PrivateKey
+	Addr          string
+	Debug         bool
+	Key           string
+	Storage       storage.Storage
+	StorageType   types.StorageType
+	CryptoKey     *rsa.PrivateKey
+	TrustedSubnet string
 }
 
 // NewServer creates new Server
@@ -78,13 +80,40 @@ func NewServer(cfg config.Config) *Server {
 		storageType = types.StorageTypeDB
 	}
 	return &Server{
-		Addr:        cfg.Address,
-		Debug:       cfg.Debug,
-		Key:         cfg.HashKey,
-		Storage:     storage,
-		StorageType: storageType,
-		CryptoKey:   cryptoKey,
+		Addr:          cfg.Address,
+		Debug:         cfg.Debug,
+		Key:           cfg.HashKey,
+		Storage:       storage,
+		StorageType:   storageType,
+		CryptoKey:     cryptoKey,
+		TrustedSubnet: cfg.TrustedSubnet,
 	}
+}
+
+func (s *Server) CheckRequestSubnetMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		if s.TrustedSubnet == "" {
+			next.ServeHTTP(rw, r)
+			return
+		} else {
+			_, IPNet, err := net.ParseCIDR(s.TrustedSubnet)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while parsing trusted subnet CIDR:", err)
+				next.ServeHTTP(rw, r)
+				return
+			}
+			ClientIP, err := resolveIP(r)
+			if err != nil {
+				loggers.ErrorLogger.Println("error while getting client's IP:", err)
+				next.ServeHTTP(rw, r)
+			}
+			if !IPNet.Contains(ClientIP) {
+				http.Error(rw, "client IP is not in trusted subnet", http.StatusForbidden)
+				return
+			}
+			next.ServeHTTP(rw, r)
+		}
+	})
 }
 
 // CompressHandler is a middleware that compresses data to gzip if gzip encoding is accepted
@@ -435,4 +464,13 @@ func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 	rw.WriteHeader(http.StatusOK)
+}
+
+func resolveIP(r *http.Request) (net.IP, error) {
+	ipStr := r.Header.Get("X-Real-IP")
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil, fmt.Errorf("failed parse ip from http header")
+	}
+	return ip, nil
 }
