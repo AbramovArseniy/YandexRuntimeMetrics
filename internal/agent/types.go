@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -76,10 +77,19 @@ type Agent struct {
 	RateLimit        int
 	UtilData         UtilizationData
 	CryptoKey        *rsa.PublicKey
+	HostAddress      string
 }
 
 // NewAgent creates new Agent
 func NewAgent(cfg config.Config) *Agent {
+	conn, err := net.Dial("tcp", cfg.Address)
+	if err != nil {
+		loggers.ErrorLogger.Println("error while making connection:", err)
+	}
+	host, _, err := net.SplitHostPort(conn.LocalAddr().String())
+	if err != nil {
+		loggers.ErrorLogger.Println("error while splitting host and port:", err)
+	}
 	var cryptoKey *rsa.PublicKey
 	if cfg.CryptoKeyFile != "" {
 		file, err := os.OpenFile(cfg.CryptoKeyFile, os.O_RDONLY, 0777)
@@ -112,5 +122,6 @@ func NewAgent(cfg config.Config) *Agent {
 		Key:              cfg.HashKey,
 		RateLimit:        cfg.RateLimit,
 		CryptoKey:        cryptoKey,
+		HostAddress:      host,
 	}
 }

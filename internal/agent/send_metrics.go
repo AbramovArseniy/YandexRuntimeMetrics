@@ -90,6 +90,7 @@ func (w *metricWorker) SendMetric() error {
 		req.Close = true
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("Content-Encoding", "gzip")
+		req.Header.Set("X-Real-IP", w.a.HostAddress)
 		resp, err := w.a.sender.client.Do(req)
 		if err != nil {
 			loggers.ErrorLogger.Println("Client.Do() error:", err)
@@ -104,6 +105,7 @@ func (w *metricWorker) SendMetric() error {
 
 // ReadMetrics sends all metrics to channel
 func (w *metricWorker) ReadMetrics(ctx context.Context) {
+
 	newMetrics := w.a.collector.CollectRandomValueMetric()
 	metrics := w.a.collector.RuntimeMetrics
 	metrics = append(metrics, newMetrics)
@@ -198,6 +200,7 @@ func (a *Agent) SendAllMetricsAsButch() {
 	req.Close = true
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Content-Encoding", "gzip")
+	req.Header.Set("X-Real-IP", a.HostAddress)
 	resp, err := a.sender.client.Do(req)
 	if err != nil {
 		loggers.ErrorLogger.Println("Client.Do() error:", err)
