@@ -90,6 +90,7 @@ func NewAgent(cfg config.Config) *Agent {
 	if err != nil {
 		loggers.ErrorLogger.Println("error while splitting host and port:", err)
 	}
+	conn.Close()
 	var cryptoKey *rsa.PublicKey
 	if cfg.CryptoKeyFile != "" {
 		file, err := os.OpenFile(cfg.CryptoKeyFile, os.O_RDONLY, 0777)
