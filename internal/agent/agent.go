@@ -32,9 +32,9 @@ func NewAgent(cfg config.Config) (*Agent, error) {
 		if err != nil {
 			loggers.ErrorLogger.Println("error while splitting host and port:", err)
 		}
+		conn.Close()
 	}
 	cfg.HostAddress = host
-	conn.Close()
 	var sender metricsender.MetricSender
 	if cfg.Protocol == "HTTP" {
 		sender = *http.NewSender(cfg)
