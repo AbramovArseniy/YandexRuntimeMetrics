@@ -4,7 +4,6 @@ package main
 import (
 	"context"
 	"database/sql"
-	"flag"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -30,9 +29,6 @@ var buildVersion, buildDate, buildCommit string = "N/A", "N/A", "N/A"
 
 // StartServer starts server
 func StartServer() {
-	var protocol string
-	flag.StringVar(&protocol, "protocol", "HTTP", "protocol_name_HTTP_or_gRPC")
-	flag.Parse()
 	cfg := config.SetServerParams()
 	var err error
 	if cfg.DatabaseAddress != "" {
@@ -50,7 +46,7 @@ func StartServer() {
 	} else {
 		cfg.Database = nil
 	}
-	if protocol == "HTTP" {
+	if cfg.Protocol == "HTTP" {
 		s := serverHTTP.NewMetricServer(cfg)
 		handler := serverHTTP.DecompressHandler(s.Router())
 		handler = serverHTTP.CompressHandler(handler)
@@ -73,7 +69,7 @@ func StartServer() {
 		if err != nil && err != http.ErrServerClosed {
 			loggers.ErrorLogger.Fatal(err)
 		}
-	} else if protocol == "gRPC" {
+	} else if cfg.Protocol == "gRPC" {
 		s := servergRPC.NewMetricServer(cfg)
 		listen, err := net.Listen("tcp", s.Addr)
 		if err != nil {

@@ -33,6 +33,7 @@ type Config struct {
 	HashKey         string
 	CryptoKeyFile   string `json:"crypto_key"`
 	TrustedSubnet   string `json:"trusted_subnet"`
+	Protocol        string
 }
 
 // SetServerParams sets server config
@@ -48,6 +49,7 @@ func SetServerParams() (cfg Config) {
 		flagCryptoKeyFile string
 		flagConfigFile    string
 		flagTrustedSubnet string
+		flagProtocol      string
 		cfgFile           string
 	)
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
@@ -60,6 +62,7 @@ func SetServerParams() (cfg Config) {
 	flag.StringVar(&flagCryptoKeyFile, "crypto-key", "", "crypto_key_file")
 	flag.StringVar(&flagConfigFile, "c", "", "config_as_json")
 	flag.StringVar(&flagTrustedSubnet, "t", "", "trusted_subnet_CIDR")
+	flag.StringVar(&flagProtocol, "protocol", "HTTP", "protocol_name_HTTP_or_gRPC")
 	flag.Parse()
 	var exists bool
 	if cfgFile, exists = os.LookupEnv("CONFIG"); !exists {
@@ -121,5 +124,6 @@ func SetServerParams() (cfg Config) {
 	if !exists {
 		cfg.TrustedSubnet = flagTrustedSubnet
 	}
+	cfg.Protocol = flagProtocol
 	return cfg
 }
