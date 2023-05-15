@@ -1,4 +1,4 @@
-package agent
+package http
 
 import (
 	"context"
@@ -12,12 +12,16 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/config"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/metriccollector"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/types"
 )
 
 // Default test preferences
 const (
 	tcp            = "tcp"
 	defaultTimeout = 2 * time.Second
+	defaultHost    = "localhost"
+	defaultPort    = "8080"
 )
 
 func TestSendCounter(t *testing.T) {
@@ -47,15 +51,16 @@ func TestSendCounter(t *testing.T) {
 		Address:        "localhost:8080",
 		RateLimit:      100,
 	}
-	a := NewAgent(cfg)
+	c := metriccollector.NewMetricCollector()
+	s := NewSender(cfg)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			metric := Metrics{
+			metric := types.Metrics{
 				ID:    test.metric.name,
 				MType: "counter",
 				Delta: &test.metric.value,
 			}
-			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
+			l, err := net.Listen(tcp, defaultHost+":"+defaultPort)
 			if err != nil {
 				t.Errorf("%v", err)
 				return
@@ -65,24 +70,20 @@ func TestSendCounter(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			})
 			srv := httptest.NewUnstartedServer(serveMux)
-			err = srv.Listener.Close()
-			if err != nil {
-				return
-			}
+			srv.Listener.Close()
 			srv.Listener = l
 			srv.Start()
-
 			defer srv.Close()
 			ctx := context.Background()
 			g, _ := errgroup.WithContext(ctx)
-			recordCh := make(chan Metrics)
-			a.collector.RuntimeMetrics = []Metrics{metric}
-			for i := 0; i < a.RateLimit; i++ {
-				w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			recordCh := make(chan types.Metrics)
+			c.RuntimeMetrics = []types.Metrics{metric}
+			for i := 0; i < s.RateLimit; i++ {
+				w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, sender: s}
 				g.Go(w.SendMetric)
 			}
-			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
-			readW.ReadMetrics(ctx)
+			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, sender: s}
+			readW.ReadMetrics(ctx, c)
 			close(recordCh)
 			err = g.Wait()
 			if (err != nil) != test.expectError {
@@ -120,15 +121,17 @@ func TestSendGauge(t *testing.T) {
 		ReportInterval: 10 * time.Second,
 		Address:        "localhost:8080",
 		RateLimit:      100,
+		HostAddress:    "127.0.0.1",
 	}
-	a := NewAgent(cfg)
+	c := metriccollector.NewMetricCollector()
+	s := NewSender(cfg)
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			metric := Metrics{
+			metric := types.Metrics{
 				ID:    test.metric.name,
 				Value: &test.metric.value,
 			}
-			l, err := net.Listen(tcp, DefaultHost+":"+DefaultPort)
+			l, err := net.Listen(tcp, defaultHost+":"+defaultPort)
 			if err != nil {
 				t.Errorf("%v", err)
 				return
@@ -138,25 +141,21 @@ func TestSendGauge(t *testing.T) {
 				w.WriteHeader(http.StatusOK)
 			})
 			srv := httptest.NewUnstartedServer(serveMux)
-			err = srv.Listener.Close()
-			if err != nil {
-				return
-			}
+			srv.Listener.Close()
 			srv.Listener = l
 			srv.Start()
-
 			defer srv.Close()
 
 			ctx := context.Background()
 			g, _ := errgroup.WithContext(ctx)
-			recordCh := make(chan Metrics)
-			a.collector.RuntimeMetrics = []Metrics{metric}
-			for i := 0; i < a.RateLimit; i++ {
-				w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
+			recordCh := make(chan types.Metrics)
+			c.RuntimeMetrics = []types.Metrics{metric}
+			for i := 0; i < s.RateLimit; i++ {
+				w := &metricWorker{ch: recordCh, mu: sync.Mutex{}, sender: s}
 				g.Go(w.SendMetric)
 			}
-			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, a: a}
-			readW.ReadMetrics(ctx)
+			readW := &metricWorker{ch: recordCh, mu: sync.Mutex{}, sender: s}
+			readW.ReadMetrics(ctx, c)
 			close(recordCh)
 			err = g.Wait()
 			if (err != nil) != test.expectError {

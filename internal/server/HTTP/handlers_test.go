@@ -23,7 +23,7 @@ func Example() {
 		Restore:       false,
 		Address:       "locashost:8080",
 	}
-	s := NewServer(cfg)
+	s := NewMetricServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -149,7 +149,7 @@ func BenchmarkTextPlainMetricHandler(b *testing.B) {
 		Restore:       false,
 		Address:       "locashost:8080",
 	}
-	s := NewServer(cfg)
+	s := NewMetricServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -204,7 +204,7 @@ func BenchmarkJSONMetricHandler(b *testing.B) {
 		Restore:       false,
 		Address:       "locashost:8080",
 	}
-	s := NewServer(cfg)
+	s := NewMetricServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -344,7 +344,7 @@ func TestPlainTextHandler(t *testing.T) {
 		Restore:       false,
 		Address:       "locashost:8080",
 	}
-	s := NewServer(cfg)
+	s := NewMetricServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)
@@ -474,7 +474,7 @@ func TestJSONHandlers(t *testing.T) {
 		Restore:       false,
 		Address:       "locashost:8080",
 	}
-	s := NewServer(cfg)
+	s := NewMetricServer(cfg)
 	handler := DecompressHandler(s.Router())
 	handler = CompressHandler(handler)
 	server := httptest.NewServer(handler)

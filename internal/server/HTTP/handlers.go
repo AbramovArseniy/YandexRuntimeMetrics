@@ -6,16 +6,14 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
-	"net"
-	_ "net/http/pprof"
-	"os"
-
-	//"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	_ "net/http/pprof"
+	"os"
 	"strconv"
 	"strings"
 
@@ -33,8 +31,8 @@ import (
 
 const contentTypeJSON = "application/json"
 
-// Server has server info
-type Server struct {
+// MetricServer has HTTP server info
+type MetricServer struct {
 	Addr          string
 	Debug         bool
 	Key           string
@@ -44,8 +42,8 @@ type Server struct {
 	TrustedSubnet string
 }
 
-// NewServer creates new Server
-func NewServer(cfg config.Config) *Server {
+// NewServer creates new MetricServer
+func NewMetricServer(cfg config.Config) *MetricServer {
 	var (
 		storage     storage.Storage
 		storageType types.StorageType
@@ -79,7 +77,7 @@ func NewServer(cfg config.Config) *Server {
 		storage = database.NewDatabase(cfg.Database)
 		storageType = types.StorageTypeDB
 	}
-	return &Server{
+	return &MetricServer{
 		Addr:          cfg.Address,
 		Debug:         cfg.Debug,
 		Key:           cfg.HashKey,
@@ -90,7 +88,7 @@ func NewServer(cfg config.Config) *Server {
 	}
 }
 
-func (s *Server) CheckRequestSubnetMiddleware(next http.Handler) http.Handler {
+func (s *MetricServer) CheckRequestSubnetMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		if s.TrustedSubnet == "" {
 			next.ServeHTTP(rw, r)
@@ -135,7 +133,7 @@ func CompressHandler(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) DecodeHandler(next http.Handler) http.Handler {
+func (s *MetricServer) DecodeHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
@@ -198,7 +196,7 @@ func GetCounterStatusOK(rw http.ResponseWriter, metricVal int64) {
 }
 
 // GetAllMetricsHandler prints info about all metrics in storage
-func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *MetricServer) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	loggers.InfoLogger.Println("Get all request")
 	rw.Header().Set("Content-Type", "text/html")
 	metrics, err := s.Storage.GetAllMetrics()
@@ -235,7 +233,7 @@ func (s *Server) GetAllMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 // PostUpdateManyMetricsHandler updates info about several metrics
-func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *MetricServer) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		http.Error(rw, "wrong content type", http.StatusBadRequest)
 		loggers.ErrorLogger.Println("Wrong content type:", r.Header.Get("Content-Type"))
@@ -268,7 +266,7 @@ func (s *Server) PostUpdateManyMetricsHandler(rw http.ResponseWriter, r *http.Re
 }
 
 // PostMetricHandler updates info about one metric
-func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *MetricServer) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	var m types.Metrics
 	metricType, metricName, metricValue := chi.URLParam(r, "type"), chi.URLParam(r, "name"), chi.URLParam(r, "value")
 	m.ID = metricName
@@ -302,7 +300,7 @@ func (s *Server) PostMetricHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 // GetMetricHandler prints value of requested metric
-func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *MetricServer) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 	var m = types.Metrics{
 		ID:    chi.URLParam(r, "name"),
 		MType: chi.URLParam(r, "type"),
@@ -341,7 +339,7 @@ func (s *Server) GetMetricHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 // PostMetricJSONHandler updates info about one metric, sent a json
-func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *MetricServer) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
@@ -396,7 +394,7 @@ func (s *Server) PostMetricJSONHandler(rw http.ResponseWriter, r *http.Request) 
 }
 
 // GetMetricPostJSONHandler prints info about metrics requested as json
-func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *MetricServer) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Content-Type") != contentTypeJSON {
 		rw.WriteHeader(http.StatusBadRequest)
 		_, err := rw.Write([]byte(`{"Status":"Bad Request"}`))
@@ -453,7 +451,7 @@ func (s *Server) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.Reques
 }
 
 // GetPingDBHandler checks if database is connected
-func (s *Server) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
+func (s *MetricServer) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
 	if s.StorageType != types.StorageTypeDB {
 		http.Error(rw, "nil database pointer", http.StatusInternalServerError)
 		return

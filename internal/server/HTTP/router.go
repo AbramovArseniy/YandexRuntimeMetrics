@@ -7,7 +7,7 @@ import (
 )
 
 // Router routes handlers to urls
-func (s *Server) Router() chi.Router {
+func (s *MetricServer) Router() chi.Router {
 	router := chi.NewRouter()
 	router.Get("/", s.GetAllMetricsHandler)
 	router.Get("/value/{type}/{name}", s.GetMetricHandler)

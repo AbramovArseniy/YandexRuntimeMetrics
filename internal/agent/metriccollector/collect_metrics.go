@@ -1,7 +1,6 @@
-package agent
+package metriccollector
 
 import (
-	"log"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -10,11 +9,12 @@ import (
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/mem"
 
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/agent/types"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 )
 
 // CollectRuntimeMetrics collects runtime metrics
-func (a *Agent) CollectRuntimeMetrics() {
+func (c *MetricCollector) CollectRuntimeMetrics() {
 	var stats runtime.MemStats
 	runtime.ReadMemStats(&stats)
 	var (
@@ -46,7 +46,7 @@ func (a *Agent) CollectRuntimeMetrics() {
 		Sys           = float64(stats.Sys)
 		TotalAlloc    = float64(stats.TotalAlloc)
 	)
-	a.collector.RuntimeMetrics = []Metrics{
+	c.RuntimeMetrics = []types.Metrics{
 		{ID: "Alloc", MType: "gauge", Value: &Alloc},
 		{ID: "BuckHashSys", MType: "gauge", Value: &BuckHashSys},
 		{ID: "Frees", MType: "gauge", Value: &Frees},
@@ -75,38 +75,38 @@ func (a *Agent) CollectRuntimeMetrics() {
 		{ID: "Sys", MType: "gauge", Value: &Sys},
 		{ID: "TotalAlloc", MType: "gauge", Value: &TotalAlloc},
 	}
-	*(a.collector.PollCount.Delta)++
+	*(c.PollCount.Delta)++
 	loggers.InfoLogger.Println("Collected GaugeMetrics")
 }
 
 // CollectRandomValueMetric collects metric with random value
-func (s *metricCollector) CollectRandomValueMetric() Metrics {
+func (s *MetricCollector) CollectRandomValueMetric() types.Metrics {
 	rand.Seed(time.Now().Unix())
 	value := rand.Float64() * 1000
-	randomValueMetric := Metrics{ID: "RandomValue", MType: "gauge", Value: &value}
+	randomValueMetric := types.Metrics{ID: "RandomValue", MType: "gauge", Value: &value}
 	loggers.InfoLogger.Println("Collected RandomValueMectric")
 	return randomValueMetric
 }
 
 // CollectUtilizationMetrics collects cpu and mem metrics
-func (a *Agent) CollectUtilizationMetrics() {
+func (c *MetricCollector) CollectUtilizationMetrics() {
 	m, err := mem.VirtualMemory()
 	if err != nil {
 		loggers.ErrorLogger.Println("error access to virtual memory: ", err)
 	}
 
-	a.UtilData.mu.Lock()
+	c.UtilData.mu.Lock()
 	timeNow := time.Now()
-	timeDiff := timeNow.Sub(a.UtilData.CPUutilLastTime)
+	timeDiff := timeNow.Sub(c.UtilData.CPUutilLastTime)
 	Total := float64(m.Total)
 	Free := float64(m.Free)
-	a.UtilData.CPUutilLastTime = timeNow
-	a.UtilData.TotalMemory = Metrics{
+	c.UtilData.CPUutilLastTime = timeNow
+	c.UtilData.TotalMemory = types.Metrics{
 		ID:    "TotalMemory",
 		MType: "gauge",
 		Value: &Total,
 	}
-	a.UtilData.FreeMemory = Metrics{
+	c.UtilData.FreeMemory = types.Metrics{
 		ID:    "FreeMemory",
 		MType: "gauge",
 		Value: &Free,
@@ -114,17 +114,17 @@ func (a *Agent) CollectUtilizationMetrics() {
 
 	cpus, err := cpu.Times(true)
 	if err != nil {
-		log.Println(err)
+		loggers.ErrorLogger.Println("error while getting cpu metrics:", err)
 	}
 	for i := range cpus {
 		newCPUTime := cpus[i].User + cpus[i].System
-		cpuUtilization := (newCPUTime - a.UtilData.CPUtime[i]) * 1000 / float64(timeDiff.Milliseconds())
-		a.UtilData.CPUutilizations[i] = Metrics{
+		cpuUtilization := (newCPUTime - c.UtilData.CPUtime[i]) * 1000 / float64(timeDiff.Milliseconds())
+		c.UtilData.CPUutilizations[i] = types.Metrics{
 			ID:    "CPUutilization" + strconv.Itoa(i+1),
 			MType: "gauge",
 			Value: &cpuUtilization,
 		}
-		a.UtilData.CPUtime[i] = newCPUTime
+		c.UtilData.CPUtime[i] = newCPUTime
 	}
-	a.UtilData.mu.Unlock()
+	c.UtilData.mu.Unlock()
 }
