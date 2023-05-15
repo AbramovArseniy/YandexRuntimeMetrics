@@ -24,7 +24,7 @@ type Agent struct {
 // NewAgent creates new Agent
 func NewAgent(cfg config.Config) (*Agent, error) {
 	var host string
-	conn, err := net.Dial("tcp", cfg.Address)
+	conn, err := net.Dial("upd", "8.8.8.8:80")
 	if err != nil {
 		loggers.ErrorLogger.Println("error while making connection:", err)
 	} else {

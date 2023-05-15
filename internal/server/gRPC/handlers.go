@@ -1,4 +1,4 @@
-package grpc_server
+package grpcserver
 
 import (
 	"context"
@@ -121,7 +121,7 @@ func (s *MetricServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequ
 	}
 	switch in.Metric.Mtype {
 	case "counter":
-		var delta int64 = in.Metric.Delta
+		var delta = in.Metric.Delta
 		m.Delta = &delta
 		curval, err := s.Storage.GetMetric(m, s.Key)
 		if err == nil {
@@ -133,7 +133,7 @@ func (s *MetricServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequ
 			Delta: *m.Delta + *curval.Delta,
 		}
 	case "gauge":
-		var value float64 = in.Metric.Value
+		var value = in.Metric.Value
 		m.Value = &value
 		response.Metric = &pb.Metric{
 			Id:    m.ID,
@@ -153,11 +153,11 @@ func (s *MetricServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequ
 
 func (s *MetricServer) UpdateManyMetrics(ctx context.Context, in *pb.UpdateManyMetricsRequest) (*pb.UpdateManyMetricsResponse, error) {
 	var response pb.UpdateManyMetricsResponse
-	var m []types.Metrics = make([]types.Metrics, len(in.Metrics))
+	var m = make([]types.Metrics, len(in.Metrics))
 	for i, metric := range in.Metrics {
 		switch metric.Mtype {
 		case "counter":
-			var delta int64 = metric.Delta
+			var delta = metric.Delta
 			m[i] = types.Metrics{
 				ID:    metric.Id,
 				MType: metric.Mtype,
@@ -168,7 +168,7 @@ func (s *MetricServer) UpdateManyMetrics(ctx context.Context, in *pb.UpdateManyM
 				in.Metrics[i].Delta = *curval.Delta + metric.Delta
 			}
 		case "gauge":
-			var value float64 = metric.Value
+			var value = metric.Value
 			m[i] = types.Metrics{
 				ID:    metric.Id,
 				MType: metric.Mtype,
