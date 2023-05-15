@@ -1,3 +1,4 @@
+// Package grpc describes sending metrics' info with gRPC protocol
 package grpc
 
 import (

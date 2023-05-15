@@ -1,3 +1,4 @@
+// Package grpcserver describes the work of gRPC server
 package grpcserver
 
 import (
@@ -83,6 +84,7 @@ func NewMetricServer(cfg config.Config) *MetricServer {
 	}
 }
 
+// CheckRequestSubnetInterceptor checks if the client's IP is in the trusted subnet
 func (s *MetricServer) CheckRequestSubnetInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
 	var strIP string
 	if s.TrustedSubnet == "" {
@@ -113,6 +115,7 @@ func (s *MetricServer) CheckRequestSubnetInterceptor(ctx context.Context, req in
 	return handler(ctx, req)
 }
 
+// UpdateMetric updates metric's value
 func (s *MetricServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequest) (*pb.UpdateMetricResponse, error) {
 	var response pb.UpdateMetricResponse
 	var m = types.Metrics{
@@ -151,6 +154,7 @@ func (s *MetricServer) UpdateMetric(ctx context.Context, in *pb.UpdateMetricRequ
 	return &response, nil
 }
 
+// UpdateManyMetrics updates many metrics' value
 func (s *MetricServer) UpdateManyMetrics(ctx context.Context, in *pb.UpdateManyMetricsRequest) (*pb.UpdateManyMetricsResponse, error) {
 	var response pb.UpdateManyMetricsResponse
 	var m = make([]types.Metrics, len(in.Metrics))
@@ -185,6 +189,7 @@ func (s *MetricServer) UpdateManyMetrics(ctx context.Context, in *pb.UpdateManyM
 	return &response, nil
 }
 
+// GetMetric returns info about one metric in the response
 func (s *MetricServer) GetMetric(ctx context.Context, in *pb.GetMetricRequest) (*pb.GetMetricResponse, error) {
 	var response pb.GetMetricResponse
 	var m = types.Metrics{
@@ -215,6 +220,7 @@ func (s *MetricServer) GetMetric(ctx context.Context, in *pb.GetMetricRequest) (
 	return &response, nil
 }
 
+// GetAllMetrics returns info about all metrics in the response
 func (s *MetricServer) GetAllMetrics(ctx context.Context, in *pb.GetAllMetricsRequest) (*pb.GetAllMetricsResponse, error) {
 	var response pb.GetAllMetricsResponse
 	metrics, err := s.Storage.GetAllMetrics()
@@ -242,6 +248,7 @@ func (s *MetricServer) GetAllMetrics(ctx context.Context, in *pb.GetAllMetricsRe
 	return &response, nil
 }
 
+// PingDatabase checks if database works well
 func (s *MetricServer) PingDatabase(ctx context.Context, _ *pb.PingDatabaseRequest) (*pb.PingDatabaseResponse, error) {
 	if err := s.Storage.Check(); err != nil || s.StorageType != types.StorageTypeDB {
 		return nil, status.Error(codes.Internal, "failed to ping database")
