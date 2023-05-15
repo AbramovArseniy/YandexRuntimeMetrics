@@ -80,7 +80,7 @@ func (c *MetricCollector) CollectRuntimeMetrics() {
 }
 
 // CollectRandomValueMetric collects metric with random value
-func (s *MetricCollector) CollectRandomValueMetric() types.Metrics {
+func (c *MetricCollector) CollectRandomValueMetric() types.Metrics {
 	rand.Seed(time.Now().Unix())
 	value := rand.Float64() * 1000
 	randomValueMetric := types.Metrics{ID: "RandomValue", MType: "gauge", Value: &value}

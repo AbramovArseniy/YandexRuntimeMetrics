@@ -26,7 +26,7 @@ import (
 )
 
 type Sender struct {
-	client           http.Client
+	client           *http.Client
 	UpdateAddress    string
 	UpdateAllAddress string
 	HostAddress      string
@@ -58,7 +58,7 @@ func NewSender(cfg config.Config) *Sender {
 		}
 	}
 	return &Sender{
-		client:           http.Client{},
+		client:           &http.Client{},
 		UpdateAddress:    fmt.Sprintf("http://%s/update/", cfg.Address),
 		UpdateAllAddress: fmt.Sprintf("http://%s/updates/", cfg.Address),
 		HostAddress:      cfg.HostAddress,
