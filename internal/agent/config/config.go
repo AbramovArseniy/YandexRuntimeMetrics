@@ -27,6 +27,8 @@ type Config struct {
 	RateLimit      int
 	HashKey        string
 	CryptoKeyFile  string `json:"crypto_key"`
+	Protocol       string
+	HostAddress    string
 }
 
 // setAgentParams set agent config
@@ -39,6 +41,7 @@ func SetAgentParams() (cfg Config) {
 		flagKey            string
 		flagCryptoKeyFile  string
 		flagConfigFile     string
+		flagProtocol       string
 		cfgFile            string
 	)
 	flag.DurationVar(&flagPollInterval, "p", defaultPollInterval, "poll_metrics_interval")
@@ -48,6 +51,7 @@ func SetAgentParams() (cfg Config) {
 	flag.StringVar(&flagKey, "k", "", "hash_key")
 	flag.StringVar(&flagCryptoKeyFile, "crypto-key", "", "crypto_key_file")
 	flag.StringVar(&flagConfigFile, "c", "", "config_file_name")
+	flag.StringVar(&flagProtocol, "protocol", "HTTP", "protocol_HTTP_or_gRPC")
 	flag.Parse()
 	var exists bool
 	if cfgFile, exists = os.LookupEnv("CONFIG"); !exists {
@@ -106,5 +110,6 @@ func SetAgentParams() (cfg Config) {
 	if !exists {
 		cfg.CryptoKeyFile = flagCryptoKeyFile
 	}
+	cfg.Protocol = flagProtocol
 	return cfg
 }
