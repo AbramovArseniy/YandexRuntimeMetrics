@@ -20,8 +20,8 @@ import (
 	pb "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/proto"
 	serverHTTP "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/HTTP"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
 	servergRPC "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/gRPC"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/postgres"
 )
 
 // build info
@@ -37,7 +37,7 @@ func StartServer() {
 			loggers.ErrorLogger.Println("opening DB error:", err)
 			cfg.Database = nil
 		} else {
-			err = database.SetDatabase(cfg.Database, cfg.DatabaseAddress)
+			err = postgres.SetDatabase(cfg.Database, cfg.DatabaseAddress)
 			if err != nil {
 				loggers.ErrorLogger.Println("error while setting database:", err)
 			}

@@ -34,6 +34,7 @@ type Config struct {
 	CryptoKeyFile   string `json:"crypto_key"`
 	TrustedSubnet   string `json:"trusted_subnet"`
 	Protocol        string
+	RedisAddress    string
 }
 
 // SetServerParams sets server config
@@ -50,6 +51,7 @@ func SetServerParams() (cfg Config) {
 		flagConfigFile    string
 		flagTrustedSubnet string
 		flagProtocol      string
+		flagRedisAddress  string
 		cfgFile           string
 	)
 	flag.BoolVar(&flagRestore, "r", defaultRestore, "restore_true/false")
@@ -63,6 +65,7 @@ func SetServerParams() (cfg Config) {
 	flag.StringVar(&flagConfigFile, "c", "", "config_as_json")
 	flag.StringVar(&flagTrustedSubnet, "t", "", "trusted_subnet_CIDR")
 	flag.StringVar(&flagProtocol, "protocol", "HTTP", "protocol_name_HTTP_or_gRPC")
+	flag.StringVar(&flagRedisAddress, "redis", "", "redis_address")
 	flag.Parse()
 	var exists bool
 	if cfgFile, exists = os.LookupEnv("CONFIG"); !exists {
@@ -124,6 +127,9 @@ func SetServerParams() (cfg Config) {
 	if !exists {
 		cfg.TrustedSubnet = flagTrustedSubnet
 	}
-	cfg.Protocol = flagProtocol
+	cfg.Address, exists = os.LookupEnv("REDIS_ADDRESS")
+	if !exists {
+		cfg.RedisAddress = flagRedisAddress
+	}
 	return cfg
 }

@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"net/http"
 	_ "net/http/pprof"
@@ -23,8 +24,9 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/loggers"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
 	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/postgres"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/redis"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/storage"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
 )
@@ -47,6 +49,7 @@ func NewMetricServer(cfg config.Config) *MetricServer {
 	var (
 		storage     storage.Storage
 		storageType types.StorageType
+		err         error
 	)
 
 	var cryptoKey *rsa.PrivateKey
@@ -68,14 +71,23 @@ func NewMetricServer(cfg config.Config) *MetricServer {
 			}
 		}
 	}
-	if cfg.Database == nil {
+	if cfg.Database != nil {
+		storage = postgres.NewDatabase(cfg.Database)
+		storageType = types.StorageTypePostgres
+	} else if cfg.RedisAddress != "" {
+		storage, err = redis.NewDatabase(cfg.RedisAddress)
+		if err != nil {
+			log.Println("error while creating redis db:", err)
+			fs := filestorage.NewFileStorage(cfg)
+			fs.SetFileStorage()
+			storage = fs
+			storageType = types.StorageTypeFile
+		}
+	} else {
 		fs := filestorage.NewFileStorage(cfg)
 		fs.SetFileStorage()
 		storage = fs
 		storageType = types.StorageTypeFile
-	} else {
-		storage = database.NewDatabase(cfg.Database)
-		storageType = types.StorageTypeDB
 	}
 	return &MetricServer{
 		Addr:          cfg.Address,
@@ -451,7 +463,7 @@ func (s *MetricServer) GetMetricPostJSONHandler(rw http.ResponseWriter, r *http.
 
 // GetPingDBHandler checks if database is connected
 func (s *MetricServer) GetPingDBHandler(rw http.ResponseWriter, r *http.Request) {
-	if s.StorageType != types.StorageTypeDB {
+	if s.StorageType != types.StorageTypePostgres {
 		http.Error(rw, "nil database pointer", http.StatusInternalServerError)
 		return
 	}

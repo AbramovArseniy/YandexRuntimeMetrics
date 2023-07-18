@@ -19,8 +19,9 @@ import (
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/myerrors"
 	pb "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/proto"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/config"
-	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/database"
 	filestorage "github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/fileStorage"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/postgres"
+	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/redis"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/storage"
 	"github.com/AbramovArseniy/YandexRuntimeMetrics/internal/server/types"
 )
@@ -43,6 +44,7 @@ func NewMetricServer(cfg config.Config) *MetricServer {
 	var (
 		storage     storage.Storage
 		storageType types.StorageType
+		err         error
 	)
 
 	var cryptoKey *rsa.PrivateKey
@@ -64,14 +66,23 @@ func NewMetricServer(cfg config.Config) *MetricServer {
 			}
 		}
 	}
-	if cfg.Database == nil {
+	if cfg.Database != nil {
+		storage = postgres.NewDatabase(cfg.Database)
+		storageType = types.StorageTypePostgres
+	} else if cfg.RedisAddress != "" {
+		storage, err = redis.NewDatabase(cfg.RedisAddress)
+		if err != nil {
+			loggers.ErrorLogger.Println("error while creating redis db:", err)
+			fs := filestorage.NewFileStorage(cfg)
+			fs.SetFileStorage()
+			storage = fs
+			storageType = types.StorageTypeFile
+		}
+	} else {
 		fs := filestorage.NewFileStorage(cfg)
 		fs.SetFileStorage()
 		storage = fs
 		storageType = types.StorageTypeFile
-	} else {
-		storage = database.NewDatabase(cfg.Database)
-		storageType = types.StorageTypeDB
 	}
 	return &MetricServer{
 		Addr:          cfg.Address,
@@ -250,7 +261,7 @@ func (s *MetricServer) GetAllMetrics(ctx context.Context, in *pb.GetAllMetricsRe
 
 // PingDatabase checks if database works well
 func (s *MetricServer) PingDatabase(ctx context.Context, _ *pb.PingDatabaseRequest) (*pb.PingDatabaseResponse, error) {
-	if err := s.Storage.Check(); err != nil || s.StorageType != types.StorageTypeDB {
+	if err := s.Storage.Check(); err != nil || s.StorageType != types.StorageTypePostgres {
 		return nil, status.Error(codes.Internal, "failed to ping database")
 	}
 	return nil, nil

@@ -1,5 +1,5 @@
 // Module database works with server's database
-package database
+package postgres
 
 import (
 	"crypto/hmac"
